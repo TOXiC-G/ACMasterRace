@@ -1,0 +1,26 @@
+# Secrets and Wi-Fi credentials
+**/secrets.h
+!**/secrets.h.example
+
+# PlatformIO build artifacts & environments
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Editor / IDE configuration
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Compiled binaries
+*.bin
+*.elf
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS generated files
+Thumbs.db
+.DS_Store

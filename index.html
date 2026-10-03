@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0D1020">
+  <title>AC Controller</title>
+  <style>:root {
+  --bg: #0D1020;
+  --surface: #161A2E;
+  --surface-raised: #1E2340;
+  --border: rgba(255,255,255,0.06);
+  --text: #E8EAF6;
+  --text-muted: #8A90B5;
+  --accent: #7C8CFF;
+  --accent-glow: rgba(124,140,255,0.28);
+  --accent-glow-hi: rgba(124,140,255,0.48);
+  --danger: #FF6B7A;
+  --danger-bg: rgba(255,107,122,0.12);
+  --success: #5BE3A5;
+  --radius: 16px;
+  --radius-sm: 8px;
+  --radius-full: 9999px;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 16px 36px;
+  overflow-x: hidden;
+  user-select: none;
+}
+input { user-select: text; -webkit-user-select: text; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+/* Layout & Containers */
+.app { width: 100%; max-width: 410px; display: flex; flex-direction: column; gap: 14px; }
+.card, .sheet { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.between { display: flex; align-items: center; justify-content: space-between; }
+.col { display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; gap: 8px; }
+.card-title {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-muted); display: flex; align-items: center; gap: 8px;
+}
+.icon { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.mono, .device-clock, .countdown-digits, .stepper-val, .schedule-time, .log-time, .wifi-tag, .input-field, .day-btn, .day-pill {
+  font-family: var(--font-mono);
+}
+/* Common Interactive Controls */
+.btn, .chip-btn, .day-btn, .sync-btn, .seg-btn {
+  font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: 180ms ease; display: inline-flex; align-items: center; justify-content: center;
+}
+.btn, .input-field, .stepper, .segmented, .schedule-row, .log-row, .day-btn, .chip-btn {
+  background: var(--surface-raised); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+.btn { min-height: 44px; min-width: 44px; padding: 10px 16px; color: var(--text); gap: 6px; }
+.btn:active:not(:disabled), .hero-btn:active:not(:disabled), .stepper-btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-accent { background: var(--accent); color: #0D1020; border-color: var(--accent); }
+.btn-danger { background: var(--danger-bg); color: var(--danger); border-color: rgba(255,107,122,0.3); }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+.btn-ghost:hover { color: var(--text); }
+.btn-sm { min-height: 38px; padding: 6px 12px; }
+/* 1. Header */
+.header { padding: 4px 2px; }
+.brand { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; letter-spacing: 0.05em; }
+.mock-tag {
+  font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+  background: rgba(124,140,255,0.15); color: var(--accent); border: 1px solid rgba(124,140,255,0.3);
+}
+.header-right { display: flex; align-items: center; gap: 10px; }
+.device-clock { font-size: 14px; font-weight: 500; color: var(--text-muted); }
+.conn-btn { background: none; border: none; padding: 6px; cursor: pointer; display: flex; align-items: center; }
+.conn-dot {
+  width: 10px; height: 10px; border-radius: 50%; background: var(--success);
+  box-shadow: 0 0 8px rgba(91,227,165,0.5); transition: background 200ms;
+}
+.conn-dot.offline { background: var(--danger); box-shadow: 0 0 8px rgba(255,107,122,0.6); }
+/* Banners & Disabled State */
+.offline-banner {
+  background: var(--danger-bg); border: 1px solid var(--danger); color: var(--danger);
+  border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; font-weight: 600; gap: 8px;
+}
+.offline-banner button, .mock-bar button {
+  padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; min-height: 32px; border: none;
+}
+.offline-banner button { background: var(--danger); color: #fff; }
+.mock-bar {
+  padding: 8px 12px; border-radius: var(--radius-sm);
+  background: rgba(124,140,255,0.08); border: 1px dashed rgba(124,140,255,0.3);
+  font-size: 12px; color: var(--accent);
+}
+.mock-bar button { border: 1px solid var(--accent); background: transparent; color: var(--accent); }
+.app[data-offline="true"] :is(.hero-btn, .card button, .card input, .footer-area button) { opacity: 0.45; pointer-events: none; }
+/* 2. Hero Section */
+.hero { display: flex; flex-direction: column; align-items: center; padding: 14px 0 6px; gap: 10px; }
+.hero-btn-box { position: relative; width: 180px; height: 180px; }
+.hero-btn {
+  width: 180px; height: 180px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.08);
+  background: var(--surface); color: var(--text-muted); cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px; transition: 250ms ease; position: relative; z-index: 2;
+}
+.hero-icon { width: 50px; height: 50px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.hero-label { font-size: 16px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.hero-btn.is-on {
+  border-color: var(--accent); background: var(--surface-raised); color: var(--accent);
+  box-shadow: 0 0 28px var(--accent-glow); animation: glowPulse 3.5s ease-in-out infinite;
+}
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 22px var(--accent-glow); }
+  50% { box-shadow: 0 0 38px var(--accent-glow-hi); }
+}
+.hero-spinner { position: absolute; top: 0; left: 0; width: 180px; height: 180px; display: none; pointer-events: none; z-index: 3; }
+.hero-spinner circle {
+  fill: none; stroke: var(--accent); stroke-width: 3.5; stroke-dasharray: 110 400;
+  transform-origin: center; animation: spin 0.85s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.hero-btn.is-busy { opacity: 0.8; cursor: wait; }
+.hero-btn.is-busy + .hero-spinner { display: block; }
+.hero-note { font-size: 13px; color: var(--text-muted); min-height: 18px; }
+.chip-alert {
+  font-family: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px;
+  border-radius: var(--radius-full); background: rgba(124,140,255,0.14);
+  border: 1px solid var(--accent); color: var(--accent); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; transition: 180ms ease;
+  margin-top: 4px;
+}
+.chip-alert:hover { background: rgba(124,140,255,0.25); }
+.chip-alert:active { transform: scale(0.97); }
+/* Switch & Input */
+.switch { position: relative; width: 46px; height: 28px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; inset: 0; cursor: pointer; background: var(--surface-raised);
+  border: 1px solid rgba(255,255,255,0.12); border-radius: var(--radius-full); transition: 180ms;
+}
+.slider::before {
+  position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px;
+  background: var(--text-muted); border-radius: 50%; transition: 180ms;
+}
+.switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
+.switch input:checked + .slider::before { transform: translateX(18px); background: #0D1020; }
+.input-field { flex: 1; height: 44px; color: var(--text); font-size: 15px; padding: 0 12px; color-scheme: dark; }
+.input-field:focus { outline: none; border-color: var(--accent); }
+/* 3. Sleep Timer Card */
+.chip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.chip-btn { min-height: 44px; border-radius: var(--radius-full); color: var(--text); }
+.chip-btn:hover { border-color: var(--accent); color: var(--accent); }
+.timer-row { margin-top: 8px; }
+.countdown-view { display: flex; flex-direction: column; align-items: center; padding: 6px 0 2px; gap: 4px; }
+.countdown-digits { font-size: 38px; font-weight: 700; color: var(--accent); letter-spacing: 0.04em; }
+.countdown-action { font-size: 13px; color: var(--text-muted); }
+.countdown-actions { display: flex; gap: 10px; margin-top: 6px; }
+/* 4. Schedules Card */
+.schedule-row { padding: 10px 12px; gap: 10px; cursor: pointer; min-height: 52px; }
+.schedule-row:hover { border-color: rgba(255,255,255,0.12); }
+.schedule-time { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.schedule-time span { color: var(--text-muted); font-size: 13px; }
+.day-pills { display: flex; gap: 4px; }
+.day-pill {
+  font-size: 10px; font-weight: 700; color: var(--text-muted); width: 17px; height: 17px;
+  display: flex; align-items: center; justify-content: center; border-radius: 3px; background: rgba(255,255,255,0.04);
+}
+.day-pill.on { color: var(--accent); background: rgba(124,140,255,0.16); }
+.empty-note { font-size: 13px; color: var(--text-muted); text-align: center; padding: 12px 0; }
+/* 5. Advanced Card */
+details.advanced-card { overflow: hidden; padding: 0; }
+details.advanced-card summary { padding: 16px; cursor: pointer; list-style: none; min-height: 48px; }
+details.advanced-card summary::-webkit-details-marker { display: none; }
+.chevron { width: 18px; height: 18px; stroke: var(--text-muted); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: 200ms ease; }
+details[open] .chevron { transform: rotate(180deg); }
+.advanced-body { display: flex; flex-direction: column; padding: 4px 16px 16px; gap: 14px; border-top: 1px solid var(--border); }
+.ctrl-group { display: flex; flex-direction: column; gap: 6px; }
+.ctrl-label { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; text-transform: uppercase; }
+.stepper { padding: 3px; }
+.stepper-btn { width: 44px; height: 44px; border: none; background: transparent; color: var(--text); font-size: 20px; font-weight: 600; cursor: pointer; border-radius: var(--radius-sm); }
+.stepper-val { font-size: 20px; font-weight: 700; }
+.segmented { display: flex; padding: 3px; gap: 3px; }
+.seg-btn { flex: 1; min-height: 40px; border: none; background: transparent; color: var(--text-muted); border-radius: 6px; }
+.seg-btn.active { background: var(--surface); color: var(--accent); }
+.adv-note { font-size: 12px; color: var(--text-muted); font-style: italic; text-align: center; }
+/* 6. Footer Controls */
+.sync-btn { flex: 1; min-height: 42px; border-radius: var(--radius-sm); background: var(--surface); color: var(--text-muted); }
+.sync-btn:hover { color: var(--text); }
+.sync-text { font-size: 12px; color: var(--text-muted); text-align: center; }
+.footer-sub { padding: 6px 2px 0; }
+.link-btn { background: none; border: none; color: var(--accent); font-size: 13px; cursor: pointer; padding: 6px 4px; }
+.wifi-tag { font-size: 12px; color: var(--text-muted); }
+/* Bottom Sheets & Dialogs */
+.backdrop {
+  position: fixed; inset: 0; background: rgba(5,7,15,0.72);
+  backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  z-index: 100; opacity: 0; pointer-events: none; transition: 220ms ease;
+}
+.backdrop.open { opacity: 1; pointer-events: auto; }
+.sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; max-width: 410px; margin: 0 auto;
+  border-bottom: none; border-radius: 20px 20px 0 0; padding: 20px; z-index: 101;
+  transform: translateY(100%); transition: 220ms ease;
+  display: flex; flex-direction: column; gap: 14px; max-height: 85vh; overflow-y: auto;
+}
+.sheet.open { transform: translateY(0); }
+.sheet-head { padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.sheet-title { font-size: 16px; font-weight: 700; }
+.days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.day-btn { min-height: 40px; color: var(--text-muted); font-weight: 600; font-size: 11px; padding: 0; }
+.day-btn.selected { background: rgba(124,140,255,0.2); border-color: var(--accent); color: var(--accent); }
+.sheet-actions { margin-top: 6px; }
+.log-row { padding: 10px 12px; font-size: 13px; }
+.log-time { font-size: 12px; color: var(--text-muted); }
+.log-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: var(--text-muted); }
+/* Toasts */
+.toast-box {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  z-index: 200; pointer-events: none; display: flex; flex-direction: column;
+  gap: 8px; align-items: center; width: 90%; max-width: 360px;
+}
+.toast {
+  background: var(--surface-raised); border: 1px solid rgba(255,255,255,0.12);
+  color: var(--text); padding: 10px 18px; border-radius: var(--radius-full);
+  font-size: 13px; font-weight: 500; box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  transition: 250ms ease;
+}
+.toast-error { border-color: var(--danger); color: var(--danger); background: #1a121d; }
+.toast-success { border-color: var(--success); color: var(--success); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }</style>
+</head>
+<body>
+<div id="sr-alert" class="sr-only" aria-live="polite"></div>
+  <main class="app" id="app-root" data-offline="false">
+    <!-- Offline Banner (shown after 2 failed polls) -->
+    <div id="offline-banner" class="offline-banner between" hidden role="alert">
+      <span>Controller offline, retrying…</span>
+      <button type="button" id="btn-retry" aria-label="Retry connection">Retry now</button>
+    </div>
+    <!-- Mock Mode Simulation Bar (?mock=1) -->
+    <div id="mock-bar" class="mock-bar between" hidden>
+      <span>Mock Mode (150-400ms delay)</span>
+      <button type="button" id="btn-mock-offline" aria-label="Simulate offline">Simulate Offline</button>
+    </div>
+    <!-- 1. Header: Brand, device clock in mono, and status dot -->
+    <header class="header between">
+      <div class="brand">
+        <span>AC</span>
+        <span id="mock-badge" class="mock-tag" hidden>MOCK</span>
+      </div>
+      <div class="header-right">
+        <div id="device-clock" class="device-clock">--:--:--</div>
+        <button type="button" id="btn-conn-dot" class="conn-btn" aria-label="Connection: connected" title="Connection status">
+        <div id="conn-dot" class="conn-dot"></div>
+        </button>
+      </div>
+    </header>
+    <!-- 2. Hero Section: 180px Circular Power Button (Priority #1) -->
+    <section class="hero" aria-labelledby="power-h1">
+      <h1 id="power-h1" class="sr-only">AC Power</h1>
+      <div class="hero-btn-box">
+        <button type="button" id="hero-btn" class="hero-btn" aria-label="Toggle AC power" aria-pressed="false">
+        <svg class="hero-icon" viewBox="0 0 24 24"><path d="M12 2v10M18.36 6.64a9 9 0 1 1-12.73 0"/></svg>
+        <span id="hero-label" class="hero-label">Off</span>
+        </button>
+        <svg class="hero-spinner" viewBox="0 0 180 180" aria-hidden="true"><circle cx="90" cy="90" r="86"/></svg>
+      </div>
+      <div id="hero-note" class="hero-note">Assumed off</div>
+      <button type="button" id="chip-setup-needed" class="chip-alert" hidden aria-label="Setup needed, choose an AC protocol">
+        <svg class="icon" style="width:13px;height:13px;" viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16M5 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>
+        <span>Setup needed — choose an AC protocol</span>
+      </button>
+    </section>
+    <!-- 3. Sleep Timer Card -->
+    <section class="card" aria-labelledby="timer-h2">
+      <div class="card-header between">
+        <h2 id="timer-h2" class="card-title">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Sleep Timer
+        </h2>
+      </div>
+      <div id="timer-inactive">
+        <div class="chip-grid">
+        <button type="button" class="chip-btn" data-m="15">15 min</button>
+        <button type="button" class="chip-btn" data-m="30">30 min</button>
+        <button type="button" class="chip-btn" data-m="60">60 min</button>
+        <button type="button" class="chip-btn" data-m="120">120 min</button>
+        </div>
+        <form id="custom-timer-form" class="timer-row row">
+        <input type="number" id="custom-min-input" class="input-field" min="1" max="720" placeholder="Custom mins" aria-label="Custom minutes">
+        <button type="submit" class="btn btn-sm">Start</button>
+        </form>
+      </div>
+      <div id="timer-active" class="countdown-view" hidden>
+        <div id="timer-digits" class="countdown-digits">00:00</div>
+        <div id="timer-action" class="countdown-action">Turns off at --:--</div>
+        <div class="countdown-actions">
+        <button type="button" id="btn-extend-15" class="btn btn-sm" aria-label="Add 15 minutes">+15 min</button>
+        <button type="button" id="btn-cancel-timer" class="btn btn-sm btn-danger" aria-label="Cancel timer">Cancel</button>
+        </div>
+      </div>
+    </section>
+    <!-- 4. Schedules Card -->
+    <section class="card" aria-labelledby="sched-h2">
+      <div class="card-header between">
+        <h2 id="sched-h2" class="card-title">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM16 2v4M8 2v4M3 10h18"/></svg>
+        Schedules
+        </h2>
+        <button type="button" id="btn-add-sched" class="btn btn-ghost btn-sm" aria-label="Add schedule">+ Add</button>
+      </div>
+      <div id="sched-list" class="col" role="list"></div>
+      <div id="sched-empty" class="empty-note" hidden>No schedules set. Tap + Add to create one.</div>
+    </section>
+    <!-- 5. Advanced Controls (Collapsible) -->
+    <details class="card advanced-card">
+      <summary class="between" aria-label="Toggle advanced settings">
+        <span class="card-title">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 21v-7m0-4V3m8 18v-9m0-4V3m8 18v-5m0-4V3M1 14h6m2-6h6m2 8h6"/></svg>
+        Advanced
+        </span>
+        <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="advanced-body">
+        <div class="ctrl-group">
+        <div class="ctrl-label">Temperature</div>
+        <div class="stepper between">
+        <button type="button" id="btn-temp-dec" class="stepper-btn" aria-label="Decrease temperature">−</button>
+        <span id="temp-display" class="stepper-val">24 °C</span>
+        <button type="button" id="btn-temp-inc" class="stepper-btn" aria-label="Increase temperature">+</button>
+        </div>
+        </div>
+        <div class="ctrl-group">
+        <div class="ctrl-label">Mode</div>
+        <div class="segmented" id="mode-seg" role="radiogroup" aria-label="Mode">
+        <button type="button" class="seg-btn" data-m="cool" role="radio" aria-checked="false">Cool</button>
+        <button type="button" class="seg-btn" data-m="fan" role="radio" aria-checked="false">Fan</button>
+        <button type="button" class="seg-btn" data-m="dry" role="radio" aria-checked="false">Dry</button>
+        </div>
+        </div>
+        <div class="ctrl-group">
+        <div class="ctrl-label">Fan Speed</div>
+        <div class="segmented" id="fan-seg" role="radiogroup" aria-label="Fan Speed">
+        <button type="button" class="seg-btn" data-f="auto" role="radio" aria-checked="false">Auto</button>
+        <button type="button" class="seg-btn" data-f="low" role="radio" aria-checked="false">Low</button>
+        <button type="button" class="seg-btn" data-f="med" role="radio" aria-checked="false">Med</button>
+        <button type="button" class="seg-btn" data-f="high" role="radio" aria-checked="false">High</button>
+        </div>
+        </div>
+        <p class="adv-note">Not every AC supports every setting.</p>
+      </div>
+    </details>
+    <!-- IR Setup Collapsible Card (Closed by default) -->
+    <details id="ir-details" class="card advanced-card">
+      <summary class="between">
+        <span class="card-title">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16M5 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>
+          IR Setup
+        </span>
+        <svg class="chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="advanced-body">
+        <!-- 1. Active protocol row -->
+        <div class="between" style="padding-bottom: 2px;">
+          <span class="ctrl-label">Active Protocol</span>
+          <span id="ir-active-label" class="mono" style="font-size: 13px; font-weight: 600; color: var(--text-muted);">None selected</span>
+        </div>
+
+        <!-- 2. Protocol picker -->
+        <div class="ctrl-group">
+          <label for="ir-proto-select" class="ctrl-label">Protocol Picker</label>
+          <div class="row">
+            <select id="ir-proto-select" class="input-field" aria-label="Select AC Protocol" style="flex: 1; cursor: pointer;"></select>
+            <button type="button" id="btn-set-proto" class="btn btn-sm btn-accent">Set active</button>
+          </div>
+        </div>
+
+        <!-- 3. Test buttons -->
+        <div class="ctrl-group">
+          <span class="ctrl-label">Test Selected Protocol</span>
+          <div class="row">
+            <button type="button" id="btn-ir-test-on" class="btn btn-sm btn-ghost" style="flex: 1; border: 1px solid var(--border);" aria-label="Send test ON signal">Send ON</button>
+            <button type="button" id="btn-ir-test-off" class="btn btn-sm btn-ghost" style="flex: 1; border: 1px solid var(--border);" aria-label="Send test OFF signal">Send OFF</button>
+          </div>
+          <div class="between" style="font-size: 12px; color: var(--text-muted); min-height: 18px;">
+            <span>These do not change the shown state.</span>
+            <span id="ir-test-feedback" class="mono" style="color: var(--success); font-weight: 700;" hidden>Sent ✓</span>
+          </div>
+        </div>
+
+        <!-- 4. Auto-scan panel -->
+        <div class="ctrl-group" style="padding-top: 6px; border-top: 1px solid var(--border);">
+          <span class="ctrl-label">Auto-Scan</span>
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.45;">Point the LED at the AC (keep it OFF first). The controller sends ON using each protocol in turn. When the AC turns on, tap &ldquo;This one worked&rdquo;.</p>
+
+          <!-- Idle scan setup -->
+          <div id="scan-idle-box" class="col" style="gap: 10px; margin-top: 4px;">
+            <div class="between">
+              <label for="scan-interval-input" class="ctrl-label">Interval: <span id="scan-interval-val" class="mono" style="color: var(--accent);">4s</span></label>
+              <input type="range" id="scan-interval-input" min="3" max="10" value="4" step="1" style="width: 140px; cursor: pointer;" aria-label="Scan interval in seconds">
+            </div>
+            <button type="button" id="btn-scan-start" class="btn btn-accent" style="width: 100%;">Start scan</button>
+          </div>
+
+          <!-- Active running scan view -->
+          <div id="scan-active-box" class="col" style="gap: 12px; margin-top: 6px;" hidden>
+            <div style="text-align: center; display: flex; flex-direction: column; gap: 4px;">
+              <div id="scan-curr-name" class="mono" style="font-size: 24px; font-weight: 700; color: var(--accent); letter-spacing: 0.02em;">--</div>
+              <div id="scan-curr-index" class="mono" style="font-size: 12px; color: var(--text-muted);">Protocol -- of --</div>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="col" style="gap: 4px;">
+              <div style="height: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-full); overflow: hidden;">
+                <div id="scan-prog-fill" style="height: 100%; width: 0%; background: var(--accent); transition: width 100ms linear;"></div>
+              </div>
+              <div class="between" style="font-size: 11px; color: var(--text-muted);">
+                <span id="scan-status-label">Scanning…</span>
+                <span id="scan-next-label" class="mono">Next in --s</span>
+              </div>
+            </div>
+
+            <!-- Navigation and action controls -->
+            <div class="row" style="flex-wrap: wrap; gap: 6px;">
+              <button type="button" id="btn-scan-prev" class="btn btn-ghost btn-sm" style="flex: 1; border: 1px solid var(--border);" aria-label="Previous protocol">◀ Back</button>
+              <button type="button" id="btn-scan-pause" class="btn btn-ghost btn-sm" style="flex: 1; border: 1px solid var(--border);">Pause</button>
+              <button type="button" id="btn-scan-resend" class="btn btn-ghost btn-sm" style="flex: 1; border: 1px solid var(--border);" title="Re-send ON signal">Re-send</button>
+              <button type="button" id="btn-scan-next" class="btn btn-ghost btn-sm" style="flex: 1; border: 1px solid var(--border);" aria-label="Next protocol">Next ▶</button>
+              <button type="button" id="btn-scan-stop" class="btn btn-danger btn-sm" style="flex: 1;">Stop</button>
+            </div>
+
+            <!-- Prominent worked button -->
+            <button type="button" id="btn-scan-worked" class="btn btn-accent" style="width: 100%; min-height: 48px; font-size: 15px;">✓ This one worked</button>
+          </div>
+
+          <!-- Post-worked verification box -->
+          <div id="scan-verify-box" class="card col" style="background: rgba(91,227,165,0.06); border-color: rgba(91,227,165,0.28); padding: 12px; gap: 10px; margin-top: 6px;" hidden>
+            <div style="font-size: 13px; font-weight: 600; color: var(--success); display: flex; align-items: center; gap: 6px;">
+              <svg class="icon" viewBox="0 0 24 24" style="stroke: var(--success);"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>Saved <strong id="verify-proto-name">--</strong> as active</span>
+            </div>
+            <div class="between" style="gap: 10px;">
+              <span style="font-size: 12px; color: var(--text-muted);">Confirm the AC switches off:</span>
+              <button type="button" id="btn-verify-off" class="btn btn-sm btn-ghost" style="border: 1px solid var(--border);">Send OFF to check</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </details>
+    <!-- 6. Footer (Sync Assumed State & Command Logs) -->
+    <footer class="footer-area col">
+      <div class="sync-row row">
+        <button type="button" id="btn-sync-on" class="sync-btn" aria-label="Mark state as on">Mark as On</button>
+        <button type="button" id="btn-sync-off" class="sync-btn" aria-label="Mark state as off">Mark as Off</button>
+      </div>
+      <p class="sync-text">Fix the shown state without sending a command</p>
+      <div class="footer-sub between">
+        <button type="button" id="btn-open-logs" class="link-btn" aria-label="View command log">Command Log</button>
+        <div class="row" style="gap: 12px; align-items: center;">
+          <a href="/update" class="link-btn" style="text-decoration:none; font-size:12px; color:var(--text-muted);" title="Over-The-Air Firmware Update">OTA Update</a>
+          <span id="wifi-rssi" class="wifi-tag" title="Wi-Fi Signal">- dBm</span>
+        </div>
+      </div>
+    </footer>
+  </main>
+  <div id="backdrop" class="backdrop" aria-hidden="true"></div>
+  <!-- Schedule Bottom Sheet -->
+  <div id="sched-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sched-title" hidden>
+    <div class="sheet-head between">
+      <h3 id="sched-title" class="sheet-title">Edit Schedule</h3>
+      <button type="button" id="btn-close-sched" class="btn btn-ghost btn-sm" aria-label="Close">&times;</button>
+    </div>
+    <form id="sched-form" class="col">
+      <input type="hidden" id="sched-id">
+      <div class="ctrl-group">
+        <label for="sched-on" class="ctrl-label">Turn ON at (optional)</label>
+        <div class="timer-row row">
+        <input type="time" id="sched-on" class="input-field">
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-on">Clear</button>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <label for="sched-off" class="ctrl-label">Turn OFF at (optional)</label>
+        <div class="timer-row row">
+        <input type="time" id="sched-off" class="input-field">
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-off">Clear</button>
+        </div>
+      </div>
+      <div class="ctrl-group">
+        <div class="between" style="align-items: baseline;">
+          <span class="ctrl-label">Apply to Days</span>
+          <div class="row" style="gap: 8px;">
+            <button type="button" id="btn-days-all" class="link-btn" style="font-size: 11px; padding: 0;">Everyday</button>
+            <span style="color: var(--border);">|</span>
+            <button type="button" id="btn-days-weekdays" class="link-btn" style="font-size: 11px; padding: 0;">Weekdays</button>
+            <span style="color: var(--border);">|</span>
+            <button type="button" id="btn-days-weekends" class="link-btn" style="font-size: 11px; padding: 0;">Weekends</button>
+          </div>
+        </div>
+        <div class="days-grid row" id="days-picker">
+        <button type="button" class="day-btn" data-d="0" title="Monday">Mon</button>
+        <button type="button" class="day-btn" data-d="1" title="Tuesday">Tue</button>
+        <button type="button" class="day-btn" data-d="2" title="Wednesday">Wed</button>
+        <button type="button" class="day-btn" data-d="3" title="Thursday">Thu</button>
+        <button type="button" class="day-btn" data-d="4" title="Friday">Fri</button>
+        <button type="button" class="day-btn" data-d="5" title="Saturday">Sat</button>
+        <button type="button" class="day-btn" data-d="6" title="Sunday">Sun</button>
+        </div>
+        <div id="days-summary" style="font-size: 11px; color: var(--accent); margin-top: 2px; font-weight: 500;">Repeats: Everyday (Mon – Sun)</div>
+      </div>
+      <div class="between" style="padding:4px 0;">
+        <span class="ctrl-label" style="margin:0;">Enabled</span>
+        <label class="switch">
+        <input type="checkbox" id="sched-enabled" checked>
+        <span class="slider"></span>
+        </label>
+      </div>
+      <div class="sheet-actions row">
+        <button type="button" id="btn-del-sched" class="btn btn-danger" style="margin-right:auto;" hidden>Delete</button>
+        <button type="button" id="btn-dup-sched" class="btn btn-ghost" hidden>Duplicate</button>
+        <button type="button" id="btn-cancel-sched" class="btn btn-ghost">Cancel</button>
+        <button type="submit" class="btn btn-accent">Save</button>
+      </div>
+    </form>
+  </div>
+  <!-- Command Log Bottom Sheet -->
+  <div id="log-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="log-title" hidden>
+    <div class="sheet-head between">
+      <h3 id="log-title" class="sheet-title">Command Log</h3>
+      <button type="button" id="btn-close-log" class="btn btn-ghost btn-sm" aria-label="Close">&times;</button>
+    </div>
+    <div id="log-list" class="col"></div>
+  </div>
+  <div id="toasts" class="toast-box" aria-live="assertive"></div>
+<script>
+    /* ==========================================================================
+      ESP32 AC CONTROLLER CLIENT SCRIPT
+      ========================================================================== */
+    (function () {
+      'use strict';
+      // --- 1. DOM Helper, State & Configuration ---
+      const $ = (id) => document.getElementById(id);
+      const CFG = { pollMs: 5000, timeoutMs: 5000, toastMs: 2500, debounceMs: 350 };
+      let state = { power: 'off', time: '--:--:--', timer: null, ac: { temp: 24, mode: 'cool', fan: 'auto' }, wifi_rssi: null, protocol: null };
+      let schedules = [], failCount = 0, sendingPower = false, lastPowerClick = 0;
+      let pollTimer = null, clockTimer = null, tickerTimer = null, timerCache = null, deviceOffsetMs = 0;
+      let protocols = [], irPollTimer = null, scanTickerTimer = null, scanCache = null;
+      // Element references
+      const appRoot = $('app-root'), heroBtn = $('hero-btn'), heroLabel = $('hero-label'), heroNote = $('hero-note');
+      const deviceClock = $('device-clock'), connDot = $('conn-dot'), offlineBanner = $('offline-banner'), srAlert = $('sr-alert');
+      // --- 2. Mock Backend (?mock=1) ---
+      const isMock = new URLSearchParams(location.search).get('mock') === '1';
+      let mockOffline = false;
+      const MOCK_PROTOCOLS = [
+        { id: 0, name: 'Gree (model 2)' },
+        { id: 1, name: 'Voltas' },
+        { id: 2, name: 'Voltas (alt)' },
+        { id: 3, name: 'Coolix' },
+        { id: 4, name: 'Gree' },
+        { id: 5, name: 'Daikin' },
+        { id: 6, name: 'LG' },
+        { id: 7, name: 'Hitachi' },
+        { id: 8, name: 'Carrier' },
+        { id: 9, name: 'Midea' },
+        { id: 10, name: 'Samsung' },
+        { id: 11, name: 'Panasonic' },
+        { id: 12, name: 'Haier' },
+        { id: 13, name: 'Whirlpool' }
+      ];
+      let mockScanTimerId = null;
+      function startMockScan() {
+        if (mockScanTimerId) clearInterval(mockScanTimerId);
+        mockScanTimerId = setInterval(() => {
+          if (!mockDb.scan.running || mockDb.scan.paused) return;
+          mockDb.scan.next_in_s -= 1;
+          if (mockDb.scan.next_in_s <= 0) {
+            mockDb.scan.index = (mockDb.scan.index + 1) % MOCK_PROTOCOLS.length;
+            mockDb.scan.current = MOCK_PROTOCOLS[mockDb.scan.index];
+            mockDb.scan.next_in_s = mockDb.scan.interval_s;
+          }
+        }, 1000);
+      }
+      function stopMockScan() {
+        if (mockScanTimerId) { clearInterval(mockScanTimerId); mockScanTimerId = null; }
+      }
+      const mockDb = {
+        power: 'off', ac: { temp: 24, mode: 'cool', fan: 'auto' }, timer: null,
+        protocol: null,
+        scan: { running: false, paused: false, index: 0, total: 12, current: null, interval_s: 4, next_in_s: 4 },
+        schedules: [
+        { id: 1, enabled: true, on: '22:30', off: '06:00', days: [1,1,1,1,1,0,0] },
+        { id: 2, enabled: false, on: '14:00', off: '16:00', days: [0,0,0,0,0,1,1] }
+        ],
+        logs: [
+        { at: '14:30:10', date: '2026-10-02', action: 'off', source: 'timer' },
+        { at: '13:00:00', date: '2026-10-02', action: 'on', source: 'manual' }
+        ],
+        wifi_rssi: -58, nextId: 3
+      };
+      const pad = (n) => String(n).padStart(2, '0');
+      const nowTime = () => { const d = new Date(); return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+      const nowDate = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+      function addLog(action, source) {
+        mockDb.logs.unshift({ at: nowTime(), date: nowDate(), action, source });
+        if (mockDb.logs.length > 10) mockDb.logs.pop();
+      }
+      function getMockState() {
+        let activeTimer = null;
+        if (mockDb.timer) {
+        const rem = Math.max(0, mockDb.timer.rem - Math.floor((Date.now() - mockDb.timer.t0) / 1000));
+        if (rem > 0) activeTimer = { remaining_s: rem, action: mockDb.timer.action };
+        else {
+        mockDb.power = mockDb.timer.action;
+        addLog(mockDb.power, 'timer');
+        mockDb.timer = null;
+        }
+        }
+        return {
+        power: mockDb.power, confirmed: false, time: nowTime(), date: nowDate(),
+        timer: activeTimer, ac: { ...mockDb.ac }, last_cmd: mockDb.logs[0] || null, wifi_rssi: mockDb.wifi_rssi,
+        protocol: mockDb.protocol
+        };
+      }
+      if (isMock) {
+        $('mock-badge').hidden = $('mock-bar').hidden = false;
+        const origFetch = window.fetch;
+        window.fetch = async (req, init = {}) => {
+        const url = new URL(typeof req === 'string' ? req : req.url, location.origin);
+        const m = (init.method || 'GET').toUpperCase(), b = init.body ? JSON.parse(init.body) : {};
+        await new Promise((r) => setTimeout(r, Math.floor(Math.random() * 250) + 150));
+        if (mockOffline) throw new TypeError('Mock offline simulation');
+        const jRes = (d) => new Response(JSON.stringify(d), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        const route = `${m} ${url.pathname}`;
+        const H = {
+        'GET /api/state': () => getMockState(),
+        'POST /api/power': () => { mockDb.power = b.on ? 'on' : 'off'; if (!b.on) mockDb.timer = null; addLog(mockDb.power, 'manual'); return getMockState(); },
+        'POST /api/sync': () => { mockDb.power = b.power === 'on' ? 'on' : 'off'; return getMockState(); },
+        'POST /api/timer': () => {
+        mockDb.timer = { rem: (Number(b.minutes) || 30) * 60, action: 'off', t0: Date.now() };
+        if (mockDb.power !== 'on') {
+          mockDb.power = 'on';
+          addLog('on', 'timer');
+        }
+        return getMockState();
+        },
+        'POST /api/timer/extend': () => {
+        if (mockDb.timer) {
+        const cur = Math.max(0, mockDb.timer.rem - Math.floor((Date.now() - mockDb.timer.t0) / 1000));
+        mockDb.timer = { rem: cur + (Number(b.minutes) || 15) * 60, action: mockDb.timer.action, t0: Date.now() };
+        }
+        return getMockState();
+        },
+        'DELETE /api/timer': () => { mockDb.timer = null; return getMockState(); },
+        'POST /api/ac': () => {
+        ['temp', 'mode', 'fan'].forEach((k) => { if (b[k] !== undefined) mockDb.ac[k] = k === 'temp' ? Number(b[k]) : b[k]; });
+        return getMockState();
+        },
+        'GET /api/schedules': () => mockDb.schedules,
+        'POST /api/schedules': () => {
+        let s = b.id ? mockDb.schedules.find((x) => x.id === Number(b.id)) : null;
+        if (s) Object.assign(s, b); else mockDb.schedules.push((s = { ...b, id: mockDb.nextId++ }));
+        return s;
+        },
+        'GET /api/log': () => mockDb.logs.slice(0, 10),
+        'GET /api/ir/protocols': () => MOCK_PROTOCOLS,
+        'GET /api/ir': () => ({ protocol: mockDb.protocol, scan: { ...mockDb.scan, total: MOCK_PROTOCOLS.length } }),
+        'POST /api/ir/protocol': () => {
+        const p = MOCK_PROTOCOLS.find((x) => x.id === Number(b.id));
+        if (!p) throw new Error('Protocol not found');
+        mockDb.protocol = p;
+        return { protocol: mockDb.protocol, scan: { ...mockDb.scan, total: MOCK_PROTOCOLS.length } };
+        },
+        'POST /api/ir/test': () => ({ ok: true }),
+        'POST /api/ir/scan': () => {
+        const act = b.action;
+        if (act === 'start') {
+          mockDb.scan.running = true;
+          mockDb.scan.paused = false;
+          mockDb.scan.interval_s = Number(b.interval_s) || 4;
+          mockDb.scan.next_in_s = mockDb.scan.interval_s;
+          mockDb.scan.index = 0;
+          mockDb.scan.current = MOCK_PROTOCOLS[0];
+          startMockScan();
+        } else if (act === 'stop') {
+          mockDb.scan.running = false;
+          mockDb.scan.paused = false;
+          mockDb.scan.current = null;
+          stopMockScan();
+        } else if (act === 'pause') {
+          mockDb.scan.paused = true;
+        } else if (act === 'resume') {
+          mockDb.scan.paused = false;
+        } else if (act === 'next') {
+          mockDb.scan.index = (mockDb.scan.index + 1) % MOCK_PROTOCOLS.length;
+          mockDb.scan.current = MOCK_PROTOCOLS[mockDb.scan.index];
+          mockDb.scan.next_in_s = mockDb.scan.interval_s;
+        } else if (act === 'prev') {
+          mockDb.scan.index = (mockDb.scan.index - 1 + MOCK_PROTOCOLS.length) % MOCK_PROTOCOLS.length;
+          mockDb.scan.current = MOCK_PROTOCOLS[mockDb.scan.index];
+          mockDb.scan.next_in_s = mockDb.scan.interval_s;
+        } else if (act === 'resend') {
+          mockDb.scan.next_in_s = mockDb.scan.interval_s;
+        }
+        return { protocol: mockDb.protocol, scan: { ...mockDb.scan, total: MOCK_PROTOCOLS.length } };
+        }
+        };
+        if (H[route]) return jRes(H[route]());
+        if (m === 'DELETE' && url.pathname.startsWith('/api/schedules/')) {
+        const id = Number(url.pathname.split('/').pop());
+        mockDb.schedules = mockDb.schedules.filter((x) => x.id !== id);
+        return jRes({ ok: true });
+        }
+        return origFetch(req, init);
+        };
+      }
+      // --- 3. UI Helpers ---
+      function announce(msg) {
+        if (srAlert) { srAlert.textContent = ''; setTimeout(() => { srAlert.textContent = msg; }, 40); }
+      }
+      function showToast(msg, type = 'info') {
+        const el = document.createElement('div');
+        el.className = `toast ${type === 'error' ? 'toast-error' : type === 'success' ? 'toast-success' : ''}`;
+        el.textContent = msg; $('toasts').appendChild(el); announce(msg);
+        setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 250); }, CFG.toastMs);
+      }
+      function fmtTime(str, withSec = false) {
+        if (!str) return '--:--';
+        const [h, m, s] = str.split(':'), d = new Date();
+        d.setHours(h, m, s || 0, 0);
+        return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', ...(withSec ? { second: '2-digit' } : {}) });
+      }
+      function fmtTarget(remSec) {
+        if (!remSec || remSec <= 0) return '--:--';
+        return new Date(Date.now() + deviceOffsetMs + remSec * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      }
+      function fmtSec(sec) {
+        const s = Math.max(0, Math.floor(sec));
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+        return h > 0 ? `${h}:${pad(m)}:${pad(r)}` : `${pad(m)}:${pad(r)}`;
+      }
+      function setSegActive(containerId, attr, targetVal) {
+        document.querySelectorAll(`#${containerId} .seg-btn`).forEach((b) => {
+        const on = b.dataset[attr] === targetVal;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-checked', String(on));
+        });
+      }
+      // --- 4. API Client ---
+      async function api(path, opts = {}) {
+        const c = new AbortController(), tid = setTimeout(() => c.abort(), CFG.timeoutMs);
+        try {
+        const res = await fetch(path, { ...opts, signal: c.signal, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || `HTTP ${res.status}`);
+        return await res.json();
+        } finally { clearTimeout(tid); }
+      }
+      function setOnline(online) {
+        failCount = online ? 0 : failCount;
+        appRoot.setAttribute('data-offline', String(!online));
+        offlineBanner.hidden = online;
+        connDot.classList.toggle('offline', !online);
+        $('btn-conn-dot').setAttribute('aria-label', `Connection: ${online ? 'connected' : 'unreachable'}`);
+      }
+      // --- 5. State Rendering ---
+      function updateClock() {
+        if (deviceOffsetMs === null || deviceOffsetMs === undefined) return;
+        const dev = new Date(Date.now() + deviceOffsetMs);
+        deviceClock.textContent = dev.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+      }
+      function startClock() { if (!clockTimer) clockTimer = setInterval(updateClock, 1000); }
+      function stopClock() { if (clockTimer) { clearInterval(clockTimer); clockTimer = null; } }
+      function render(d) {
+        state = { ...state, ...d };
+        if (d.time) {
+        const [h, m, s] = d.time.split(':'), dev = new Date();
+        dev.setHours(h, m, s || 0, 0);
+        deviceOffsetMs = dev.getTime() - Date.now();
+        updateClock();
+        }
+        const on = state.power === 'on';
+        heroBtn.classList.toggle('is-on', on);
+        heroBtn.setAttribute('aria-pressed', String(on));
+        heroLabel.textContent = on ? 'On' : 'Off';
+        heroNote.textContent = on ? 'Assumed on' : 'Assumed off';
+        const hasTimer = d.timer && d.timer.remaining_s > 0;
+        $('timer-inactive').hidden = hasTimer;
+        $('timer-active').hidden = !hasTimer;
+        if (hasTimer) {
+        timerCache = { remaining_s: d.timer.remaining_s, startLocalMs: performance.now(), action: d.timer.action };
+        tickCountdown();
+        if (!tickerTimer) tickerTimer = setInterval(tickCountdown, 1000);
+        } else {
+        timerCache = null;
+        if (tickerTimer) { clearInterval(tickerTimer); tickerTimer = null; }
+        }
+        if (d.ac) {
+        if (d.ac.temp) $('temp-display').textContent = `${d.ac.temp} °C`;
+        if (d.ac.mode) setSegActive('mode-seg', 'm', d.ac.mode);
+        if (d.ac.fan) setSegActive('fan-seg', 'f', d.ac.fan);
+        }
+        if (d.wifi_rssi != null) $('wifi-rssi').textContent = `${d.wifi_rssi} dBm`;
+        if (d.protocol !== undefined) {
+        state.protocol = d.protocol;
+        $('chip-setup-needed').hidden = Boolean(d.protocol);
+        $('ir-active-label').textContent = d.protocol ? d.protocol.name : 'None selected';
+        $('ir-active-label').style.color = d.protocol ? 'var(--accent)' : 'var(--text-muted)';
+        if (d.protocol && $('ir-proto-select') && $('ir-proto-select').value !== String(d.protocol.id)) {
+          $('ir-proto-select').value = d.protocol.id;
+        }
+        }
+      }
+      function tickCountdown() {
+        if (!timerCache) return;
+        const elapsed = (performance.now() - timerCache.startLocalMs) / 1000;
+        const rem = Math.max(0, timerCache.remaining_s - elapsed);
+        $('timer-digits').textContent = fmtSec(rem);
+        $('timer-action').textContent = `Turns off at ${fmtTarget(rem)}`;
+        if (rem <= 0) {
+        if (tickerTimer) { clearInterval(tickerTimer); tickerTimer = null; }
+        poll();
+        }
+      }
+      // --- 6. Hero Power Control (Priority #1) ---
+      heroBtn.onclick = async () => {
+        const now = Date.now();
+        if (sendingPower || now - lastPowerClick < CFG.debounceMs) return;
+        lastPowerClick = now; sendingPower = true;
+        heroBtn.classList.add('is-busy'); heroBtn.disabled = true;
+        try {
+        const res = await api('/api/power', { method: 'POST', body: JSON.stringify({ on: state.power !== 'on' }) });
+        render(res); setOnline(true);
+        showToast(`AC turned ${res.power.toUpperCase()}`, 'success');
+        } catch (err) {
+        showToast(err?.message || "Couldn't reach the AC controller", 'error');
+        if (++failCount >= 2) setOnline(false);
+        } finally {
+        sendingPower = false; heroBtn.classList.remove('is-busy'); heroBtn.disabled = false;
+        }
+      };
+      // --- 7. Sleep Timer Controls ---
+      document.querySelectorAll('.chip-btn').forEach((b) => {
+        b.onclick = () => setTimer(Number(b.dataset.m));
+      });
+      $('custom-timer-form').onsubmit = (e) => {
+        e.preventDefault();
+        const m = Number($('custom-min-input').value);
+        if (!m || m < 1) return showToast('Enter valid minutes (min 1)', 'error');
+        setTimer(m); $('custom-min-input').value = '';
+      };
+      async function setTimer(minutes) {
+        try {
+        const res = await api('/api/timer', { method: 'POST', body: JSON.stringify({ minutes, action: 'off' }) });
+        render(res); showToast(`Timer set: AC ON for ${minutes} min`);
+        } catch (_) { showToast("Couldn't start timer", 'error'); }
+      }
+      $('btn-extend-15').onclick = async () => {
+        try { render(await api('/api/timer/extend', { method: 'POST', body: JSON.stringify({ minutes: 15 }) })); showToast('Extended by 15 min'); }
+        catch (_) { showToast("Couldn't extend timer", 'error'); }
+      };
+      $('btn-cancel-timer').onclick = async () => {
+        try { render(await api('/api/timer', { method: 'DELETE' })); showToast('Timer cancelled'); }
+        catch (_) { showToast("Couldn't cancel timer", 'error'); }
+      };
+      // --- 8. Schedules & Bottom Sheet ---
+      const DAY_NAMES = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+      let schedDays = [1, 1, 1, 1, 1, 0, 0];
+      function renderSchedules() {
+        $('sched-empty').hidden = schedules.length > 0;
+        $('sched-list').innerHTML = schedules.map((s) => {
+        const t = s.on && s.off ? `${fmtTime(s.on)} <span>&rarr;</span> ${fmtTime(s.off)}` : (s.on ? `On ${fmtTime(s.on)}` : (s.off ? `Off ${fmtTime(s.off)}` : 'No time'));
+        const pills = (s.days || [0,0,0,0,0,0,0]).map((on, i) => `<div class="day-pill ${on ? 'on' : ''}">${DAY_NAMES[i]}</div>`).join('');
+        return `<div class="schedule-row between" role="listitem" data-id="${s.id}">
+        <div class="col" style="gap:4px;"><div class="schedule-time">${t}</div><div class="day-pills">${pills}</div></div>
+        <label class="switch" onclick="event.stopPropagation()">
+        <input type="checkbox" class="sched-switch" data-id="${s.id}" ${s.enabled ? 'checked' : ''} aria-label="Toggle schedule">
+        <span class="slider"></span>
+        </label>
+        </div>`;
+        }).join('');
+      }
+      $('sched-list').onclick = (e) => {
+        if (e.target.closest('.sched-switch')) return;
+        const row = e.target.closest('.schedule-row');
+        if (row) {
+        const s = schedules.find((x) => x.id === Number(row.dataset.id));
+        if (s) openSchedModal(s);
+        }
+      };
+      $('sched-list').onchange = async (e) => {
+        const sw = e.target.closest('.sched-switch');
+        if (!sw) return;
+        const s = schedules.find((x) => x.id === Number(sw.dataset.id));
+        if (!s) return;
+        const next = sw.checked;
+        try {
+        const updated = await api('/api/schedules', { method: 'POST', body: JSON.stringify({ ...s, enabled: next }) });
+        Object.assign(s, updated);
+        showToast(next ? 'Schedule enabled' : 'Schedule disabled');
+        } catch (_) {
+        sw.checked = !next;
+        showToast("Couldn't update schedule", 'error');
+        }
+      };
+      const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      function getDaysSummaryText(days) {
+        const count = days.filter(Boolean).length;
+        if (count === 7) return 'Repeats: Everyday (Mon – Sun)';
+        if (count === 0) return '⚠️ No days selected (schedule won\'t run)';
+        if (days[0] && days[1] && days[2] && days[3] && days[4] && !days[5] && !days[6]) {
+          return 'Repeats: Weekdays (Mon – Fri)';
+        }
+        if (!days[0] && !days[1] && !days[2] && !days[3] && !days[4] && days[5] && days[6]) {
+          return 'Repeats: Weekends (Sat, Sun)';
+        }
+        const names = days.map((on, i) => on ? DAY_LABELS[i] : null).filter(Boolean);
+        return `Repeats: ${names.join(', ')}`;
+      }
+      function openSchedModal(s = null) {
+        $('sched-title').textContent = s ? 'Edit Schedule' : 'Add Schedule';
+        $('sched-id').value = s ? s.id : '';
+        $('sched-on').value = s ? (s.on || '') : '22:00';
+        $('sched-off').value = s ? (s.off || '') : '06:00';
+        $('sched-enabled').checked = s ? Boolean(s.enabled) : true;
+        schedDays = Array.isArray(s?.days) ? [...s.days] : [1, 1, 1, 1, 1, 1, 1];
+        $('btn-del-sched').hidden = !s;
+        $('btn-dup-sched').hidden = !s;
+        renderDayButtons();
+        openModal($('sched-sheet'));
+      }
+      function renderDayButtons() {
+        document.querySelectorAll('#days-picker .day-btn').forEach((b) => {
+        const d = Number(b.dataset.d);
+        b.classList.toggle('selected', Boolean(schedDays[d]));
+        });
+        const summary = $('days-summary');
+        if (summary) summary.textContent = getDaysSummaryText(schedDays);
+      }
+      $('btn-days-all').onclick = () => {
+        schedDays = [1, 1, 1, 1, 1, 1, 1];
+        renderDayButtons();
+      };
+      $('btn-days-weekdays').onclick = () => {
+        schedDays = [1, 1, 1, 1, 1, 0, 0];
+        renderDayButtons();
+      };
+      $('btn-days-weekends').onclick = () => {
+        schedDays = [0, 0, 0, 0, 0, 1, 1];
+        renderDayButtons();
+      };
+      $('btn-dup-sched').onclick = () => {
+        $('sched-id').value = '';
+        $('sched-title').textContent = 'Duplicate Schedule';
+        $('btn-del-sched').hidden = true;
+        $('btn-dup-sched').hidden = true;
+        showToast('Duplicating: adjust days and tap Save');
+      };
+      $('days-picker').onclick = (e) => {
+        const b = e.target.closest('.day-btn');
+        if (!b) return;
+        const d = Number(b.dataset.d);
+        schedDays[d] = schedDays[d] ? 0 : 1;
+        renderDayButtons();
+      };
+      $('btn-clear-on').onclick = () => { $('sched-on').value = ''; };
+      $('btn-clear-off').onclick = () => { $('sched-off').value = ''; };
+      $('sched-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const id = $('sched-id').value ? Number($('sched-id').value) : undefined;
+        const on = $('sched-on').value.trim() || null, off = $('sched-off').value.trim() || null;
+        if (!on && !off) return showToast('Set at least On or Off time', 'error');
+        const payload = { enabled: $('sched-enabled').checked, on, off, days: schedDays };
+        if (id) payload.id = id;
+        try {
+        const saved = await api('/api/schedules', { method: 'POST', body: JSON.stringify(payload) });
+        const i = id ? schedules.findIndex((x) => x.id === id) : -1;
+        if (i >= 0) schedules[i] = saved; else schedules.push(saved);
+        renderSchedules(); closeModals(); showToast('Schedule saved', 'success');
+        } catch (_) { showToast("Couldn't save schedule", 'error'); }
+      };
+      $('btn-del-sched').onclick = async () => {
+        const id = $('sched-id').value;
+        if (!id) return;
+        try {
+        await api(`/api/schedules/${id}`, { method: 'DELETE' });
+        schedules = schedules.filter((x) => x.id !== Number(id));
+        renderSchedules(); closeModals(); showToast('Schedule deleted');
+        } catch (_) { showToast("Couldn't delete schedule", 'error'); }
+      };
+      // --- 9. Advanced AC Controls ---
+      async function updateAc(obj) {
+        try { render(await api('/api/ac', { method: 'POST', body: JSON.stringify(obj) })); }
+        catch (_) { showToast("Couldn't update settings", 'error'); }
+      }
+      $('btn-temp-dec').onclick = () => { const t = state.ac?.temp || 24; if (t > 16) updateAc({ temp: t - 1 }); };
+      $('btn-temp-inc').onclick = () => { const t = state.ac?.temp || 24; if (t < 30) updateAc({ temp: t + 1 }); };
+      $('mode-seg').onclick = (e) => { const b = e.target.closest('.seg-btn'); if (b && b.dataset.m !== state.ac?.mode) updateAc({ mode: b.dataset.m }); };
+      $('fan-seg').onclick = (e) => { const b = e.target.closest('.seg-btn'); if (b && b.dataset.f !== state.ac?.fan) updateAc({ fan: b.dataset.f }); };
+      // --- 10. IR Setup & Auto-Scan ---
+      async function loadProtocols() {
+        if (protocols.length > 0) return;
+        try {
+        const list = await api('/api/ir/protocols');
+        if (Array.isArray(list)) {
+          protocols = list;
+          const sel = $('ir-proto-select');
+          sel.innerHTML = '';
+          list.forEach((p) => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = p.name;
+          if (state.protocol && state.protocol.id === p.id) opt.selected = true;
+          sel.appendChild(opt);
+          });
+        }
+        } catch (_) {}
+      }
+      function renderIr(data) {
+        if (!data) return;
+        if (data.protocol !== undefined) {
+        state.protocol = data.protocol;
+        $('chip-setup-needed').hidden = Boolean(data.protocol);
+        $('ir-active-label').textContent = data.protocol ? data.protocol.name : 'None selected';
+        $('ir-active-label').style.color = data.protocol ? 'var(--accent)' : 'var(--text-muted)';
+        if (data.protocol && $('ir-proto-select') && $('ir-proto-select').value !== String(data.protocol.id)) {
+          $('ir-proto-select').value = data.protocol.id;
+        }
+        }
+        const s = data.scan;
+        scanCache = s ? { ...s, localSyncMs: performance.now() } : null;
+        const running = Boolean(s && s.running);
+        $('scan-idle-box').hidden = running;
+        $('scan-active-box').hidden = !running;
+        if (running && s) {
+        const curName = s.current ? s.current.name : 'Scanning…';
+        if ($('scan-curr-name').textContent !== curName) {
+          $('scan-curr-name').textContent = curName;
+          announce(`Testing protocol ${curName}, ${s.index + 1} of ${s.total}`);
+        }
+        $('scan-curr-index').textContent = `Protocol ${s.index + 1} of ${s.total}`;
+        $('btn-scan-pause').textContent = s.paused ? 'Resume' : 'Pause';
+        $('scan-status-label').textContent = s.paused ? 'Paused' : 'Scanning…';
+        tickScanProgress();
+        if (!scanTickerTimer) scanTickerTimer = setInterval(tickScanProgress, 100);
+        } else {
+        if (scanTickerTimer) { clearInterval(scanTickerTimer); scanTickerTimer = null; }
+        }
+        checkIrPolling();
+      }
+      function tickScanProgress() {
+        if (!scanCache || !scanCache.running) return;
+        const elapsed = scanCache.paused ? 0 : (performance.now() - scanCache.localSyncMs) / 1000;
+        const rem = Math.max(0, (scanCache.next_in_s != null ? scanCache.next_in_s : scanCache.interval_s) - elapsed);
+        const interval = scanCache.interval_s || 4;
+        const pct = Math.min(100, Math.max(0, ((interval - rem) / interval) * 100));
+        $('scan-prog-fill').style.width = `${pct}%`;
+        $('scan-next-label').textContent = scanCache.paused ? 'Paused' : `Next in ${Math.ceil(rem)}s`;
+      }
+      async function pollIr() {
+        try {
+        const data = await api('/api/ir');
+        renderIr(data);
+        } catch (_) {}
+      }
+      function checkIrPolling() {
+        const cardOpen = Boolean($('ir-details') && $('ir-details').open);
+        const isScanning = Boolean(scanCache && scanCache.running);
+        const shouldPoll = cardOpen && isScanning && !document.hidden;
+        if (shouldPoll) {
+        if (!irPollTimer) irPollTimer = setInterval(pollIr, 1000);
+        } else {
+        stopIrPoll();
+        }
+      }
+      function stopIrPoll() {
+        if (irPollTimer) { clearInterval(irPollTimer); irPollTimer = null; }
+      }
+      $('chip-setup-needed').onclick = () => {
+        const d = $('ir-details');
+        d.open = true;
+        loadProtocols();
+        pollIr();
+        checkIrPolling();
+        d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+      $('ir-details').ontoggle = () => {
+        if ($('ir-details').open) {
+        loadProtocols();
+        pollIr();
+        }
+        checkIrPolling();
+      };
+      $('btn-set-proto').onclick = async () => {
+        const id = Number($('ir-proto-select').value);
+        try {
+        const res = await api('/api/ir/protocol', { method: 'POST', body: JSON.stringify({ id }) });
+        renderIr(res);
+        showToast(`Active: ${res.protocol?.name || 'Saved'}`, 'success');
+        } catch (err) {
+        showToast(err?.message || 'Failed to set protocol', 'error');
+        }
+      };
+      async function sendIrTest(power) {
+        const selVal = $('ir-proto-select').value;
+        const id = selVal ? Number(selVal) : (state.protocol ? state.protocol.id : 0);
+        const fb = $('ir-test-feedback');
+        try {
+        await api('/api/ir/test', {
+          method: 'POST',
+          body: JSON.stringify({ id, power, temp: 24, mode: 'cool', fan: 'auto' })
+        });
+        fb.hidden = false;
+        fb.textContent = 'Sent ✓';
+        announce(`Test ${power.toUpperCase()} sent`);
+        setTimeout(() => { fb.hidden = true; }, 2000);
+        } catch (err) {
+        showToast(err?.message || 'Failed to send test command', 'error');
+        }
+      }
+      $('btn-ir-test-on').onclick = () => sendIrTest('on');
+      $('btn-ir-test-off').onclick = () => sendIrTest('off');
+      $('scan-interval-input').oninput = (e) => {
+        $('scan-interval-val').textContent = `${e.target.value}s`;
+      };
+      $('btn-scan-start').onclick = async () => {
+        const interval_s = Number($('scan-interval-input').value) || 4;
+        $('scan-verify-box').hidden = true;
+        try {
+        const res = await api('/api/ir/scan', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'start', interval_s })
+        });
+        renderIr(res);
+        showToast('Scan started', 'info');
+        } catch (err) {
+        showToast(err?.message || 'Failed to start scan', 'error');
+        }
+      };
+      async function sendScanAction(action) {
+        try {
+        const res = await api('/api/ir/scan', {
+          method: 'POST',
+          body: JSON.stringify({ action })
+        });
+        renderIr(res);
+        if (action === 'resend') showToast('Re-sent ON', 'info');
+        } catch (err) {
+        showToast(err?.message || `Failed to ${action} scan`, 'error');
+        }
+      }
+      $('btn-scan-pause').onclick = () => {
+        const isPaused = Boolean(scanCache && scanCache.paused);
+        sendScanAction(isPaused ? 'resume' : 'pause');
+      };
+      $('btn-scan-prev').onclick = () => sendScanAction('prev');
+      $('btn-scan-next').onclick = () => sendScanAction('next');
+      $('btn-scan-resend').onclick = () => sendScanAction('resend');
+      $('btn-scan-stop').onclick = () => sendScanAction('stop');
+      $('btn-scan-worked').onclick = async () => {
+        if (!scanCache || !scanCache.current) return;
+        const savedProto = scanCache.current;
+        try {
+        const pRes = await api('/api/ir/protocol', {
+          method: 'POST',
+          body: JSON.stringify({ id: savedProto.id })
+        });
+        const sRes = await api('/api/ir/scan', {
+          method: 'POST',
+          body: JSON.stringify({ action: 'stop' })
+        });
+        renderIr({ ...pRes, ...sRes });
+        showToast(`Saved ${savedProto.name}`, 'success');
+        $('verify-proto-name').textContent = savedProto.name;
+        $('scan-verify-box').hidden = false;
+        } catch (err) {
+        showToast(err?.message || 'Failed to save protocol', 'error');
+        }
+      };
+      $('btn-verify-off').onclick = async () => {
+        const p = state.protocol || (scanCache && scanCache.current);
+        if (!p) return;
+        try {
+        await api('/api/ir/test', {
+          method: 'POST',
+          body: JSON.stringify({ id: p.id, power: 'off', temp: 24, mode: 'cool', fan: 'auto' })
+        });
+        showToast('OFF command sent', 'success');
+        } catch (err) {
+        showToast(err?.message || 'Failed to send OFF', 'error');
+        }
+      };
+      // --- 11. Footer Sync & Command Logs ---
+      async function syncPower(p) {
+        try { render(await api('/api/sync', { method: 'POST', body: JSON.stringify({ power: p }) })); showToast(`Marked as ${p.toUpperCase()} (no IR sent)`); }
+        catch (_) { showToast("Couldn't sync state", 'error'); }
+      }
+      $('btn-sync-on').onclick = () => syncPower('on');
+      $('btn-sync-off').onclick = () => syncPower('off');
+      $('btn-open-logs').onclick = async () => {
+        openModal($('log-sheet'));
+        const list = $('log-list');
+        list.innerHTML = '<div class="empty-note">Loading logs…</div>';
+        try {
+        const logs = await api('/api/log');
+        list.innerHTML = logs.length ? logs.map((l) => `
+        <div class="log-row between">
+        <div>
+        <div style="font-weight:600;">Power ${l.action.toUpperCase()}</div>
+        <div class="log-time">${l.date ? l.date + ' ' : ''}${fmtTime(l.at, true)}</div>
+        </div>
+        <div class="log-badge">${l.source || 'manual'}</div>
+        </div>
+        `).join('') : '<div class="empty-note">No commands logged yet.</div>';
+        } catch (_) {
+        list.innerHTML = '<div class="empty-note" style="color:var(--danger)">Failed to load logs.</div>';
+        }
+      };
+      // --- 12. Modal Handlers ---
+      function openModal(el) {
+        $('backdrop').classList.add('open');
+        el.hidden = false;
+        void el.offsetWidth;
+        el.classList.add('open');
+      }
+      function closeModals() {
+        $('backdrop').classList.remove('open');
+        [$('sched-sheet'), $('log-sheet')].forEach((m) => {
+        m.classList.remove('open');
+        setTimeout(() => { m.hidden = true; }, 220);
+        });
+      }
+      $('backdrop').onclick = closeModals;
+      ['btn-close-sched', 'btn-cancel-sched', 'btn-close-log'].forEach((id) => $(id).onclick = closeModals);
+      $('btn-add-sched').onclick = () => openSchedModal(null);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModals(); });
+      // --- 13. Polling, Visibility & Offline Retry ---
+      async function poll() {
+        try { render(await api('/api/state')); setOnline(true); }
+        catch (_) { if (++failCount >= 2) setOnline(false); }
+      }
+      async function fetchScheds() {
+        try {
+        const d = await api('/api/schedules');
+        if (Array.isArray(d)) { schedules = d; renderSchedules(); }
+        } catch (_) {}
+      }
+      function startPoll() { stopPoll(); pollTimer = setInterval(poll, CFG.pollMs); }
+      function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+        stopPoll();
+        stopClock();
+        stopIrPoll();
+        if (tickerTimer) { clearInterval(tickerTimer); tickerTimer = null; }
+        if (scanTickerTimer) { clearInterval(scanTickerTimer); scanTickerTimer = null; }
+        } else {
+        poll(); startPoll();
+        startClock(); updateClock();
+        if (timerCache && !tickerTimer) tickerTimer = setInterval(tickCountdown, 1000);
+        checkIrPolling();
+        }
+      });
+      $('btn-retry').onclick = async () => {
+        $('btn-retry').disabled = true; $('btn-retry').textContent = 'Retrying…';
+        try { await poll(); await fetchScheds(); await pollIr(); }
+        finally { $('btn-retry').disabled = false; $('btn-retry').textContent = 'Retry now'; }
+      };
+      const mockOfflineBtn = $('btn-mock-offline');
+      if (mockOfflineBtn) {
+        mockOfflineBtn.onclick = () => {
+        mockOffline = !mockOffline;
+        mockOfflineBtn.textContent = mockOffline ? 'Restore Online' : 'Simulate Offline';
+        mockOfflineBtn.style.background = mockOffline ? 'var(--danger)' : 'transparent';
+        mockOfflineBtn.style.color = mockOffline ? '#fff' : 'var(--accent)';
+        if (mockOffline) { failCount = 2; setOnline(false); } else { poll(); }
+        };
+      }
+      $('btn-conn-dot').onclick = () => { if (isMock && mockOfflineBtn) mockOfflineBtn.click(); };
+      // --- 14. Init ---
+      Promise.allSettled([poll(), fetchScheds(), pollIr()]);
+      startPoll();
+      startClock();
+    })();
+  </script>
+</body>
+</html>
