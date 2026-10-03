@@ -64,6 +64,41 @@ static void connectWiFi() {
   s_last_wifi_retry_ms = millis();
 }
 
+static bool s_ota_initialized = false;
+static void setupOTA() {
+  if (s_ota_initialized) return;
+
+  ArduinoOTA.setHostname(DEVICE_HOSTNAME);
+
+  ArduinoOTA.onStart([]() {
+    String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
+    Serial.printf("[OTA] Start updating %s\n", type.c_str());
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\n[OTA] Update successful! Rebooting...");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    static unsigned int last_pct = 999;
+    unsigned int pct = progress / (total / 100);
+    if (pct % 10 == 0 && pct != last_pct) {
+      last_pct = pct;
+      Serial.printf("[OTA] Progress: %u%%\n", pct);
+    }
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("[OTA] Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+
+  ArduinoOTA.begin();
+  s_ota_initialized = true;
+  Serial.printf("[OTA] Ready! Wi-Fi flash with: pio run -t upload --upload-port %s.local\n", DEVICE_HOSTNAME);
+}
+
 static void handleWiFiReconnect() {
   if (WiFi.status() == WL_CONNECTED) {
     if (!s_wifi_connected) {
@@ -104,41 +139,7 @@ static void handleWiFiReconnect() {
         s_wifi_retry_interval_ms = kMaxWifiRetryIntervalMs;
       }
     }
-}
-
-static bool s_ota_initialized = false;
-static void setupOTA() {
-  if (s_ota_initialized) return;
-
-  ArduinoOTA.setHostname(DEVICE_HOSTNAME);
-
-  ArduinoOTA.onStart([]() {
-    String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
-    Serial.printf("[OTA] Start updating %s\n", type.c_str());
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\n[OTA] Update successful! Rebooting...");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    static unsigned int last_pct = 999;
-    unsigned int pct = progress / (total / 100);
-    if (pct % 10 == 0 && pct != last_pct) {
-      last_pct = pct;
-      Serial.printf("[OTA] Progress: %u%%\n", pct);
-    }
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("[OTA] Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-
-  ArduinoOTA.begin();
-  s_ota_initialized = true;
-  Serial.printf("[OTA] Ready! Wi-Fi flash with: pio run -t upload --upload-port %s.local\n", DEVICE_HOSTNAME);
+  }
 }
 
 void setup() {

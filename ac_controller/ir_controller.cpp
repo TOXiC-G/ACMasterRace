@@ -150,7 +150,7 @@ void initIr(GlobalState& state) {
   // Validate active_protocol_id from storage; default to Gree (model 2) if not set or out of bounds
   if (state.active_protocol_id < 0 || state.active_protocol_id >= s_protocol_count) {
     state.active_protocol_id = defaultProtoId;
-    saveProtocolStorage(state.active_protocol_id);
+    saveActiveProtocol(state.active_protocol_id);
   }
 
   Serial.printf("[IR] Active protocol set to #%d (%s)\n",
