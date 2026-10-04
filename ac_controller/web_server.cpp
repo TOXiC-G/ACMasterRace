@@ -31,7 +31,7 @@ static void sendJsonError(WebServer& server, int statusCode, const char* message
 
 static void buildStateJson(JsonDocument& doc, const GlobalState& state) {
   doc["power"] = state.power_on ? "on" : "off";
-  doc["confirmed"] = false;
+  doc["confirmed"] = isPowerCommandVerified(state.power_on);
 
   String timeStr, dateStr;
   if (getFormattedTimeAndDate(timeStr, dateStr)) {

@@ -12,6 +12,8 @@ const uint16_t kIrLedPin = 4;
 const uint32_t kMinIrIntervalMs = 400;         // Minimum time allowed between IR sends
 const uint32_t kRedundantOnThresholdMs = 60000; // Skip redundant ON within 60s
 const uint32_t kWdtTimeoutMs = 8000;           // Task Watchdog timeout in ms
+const uint8_t  kMaxPowerAttempts = 5;          // Total transmissions for power ON/OFF commands (1 initial + 4 retries)
+const uint32_t kPowerRetryIntervalMs = 1000;   // Wait 1000ms between power command retries
 
 // Default AC State
 const uint8_t  kDefaultTemp = 24;

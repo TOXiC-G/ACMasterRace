@@ -199,4 +199,7 @@ void loop() {
 
   // Non-blocking auto-scan ticker
   updateAutoScanLoop(g_state);
+
+  // Non-blocking power command retry loop with phototransistor feedback check
+  updatePowerRetryLoop(g_state);
 }

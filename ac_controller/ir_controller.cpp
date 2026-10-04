@@ -243,10 +243,9 @@ bool sendIrCommand(int protocol_id, bool power, uint8_t temp, const String& mode
   desired.sleep    = -1;
   desired.clock    = -1;
 
-  // Pass previous state pointer if previous state matches same protocol
-  const stdAc::state_t* prevPtr = (s_has_prev_state && s_prev_state.protocol == desired.protocol) ? &s_prev_state : nullptr;
-
-  s_irac.sendAc(desired, prevPtr);
+  // We pass nullptr instead of prevPtr so IRac always transmits a full, complete
+  // frame and never suppresses duplicate power commands or delta-optimizes away frames.
+  s_irac.sendAc(desired, nullptr);
   s_prev_state = desired;
   s_has_prev_state = true;
   s_last_ir_send_ms = millis();
@@ -257,11 +256,106 @@ bool sendIrCommand(int protocol_id, bool power, uint8_t temp, const String& mode
   return true;
 }
 
+// -----------------------------------------------------------------------------
+// Hardware Feedback Sensor (Phototransistor) Interface
+// -----------------------------------------------------------------------------
+
+// Checks whether the AC unit is physically powered ON via an optical sensor
+// (e.g., phototransistor aligned with the AC unit's power/run LED indicator).
+// Currently hardcoded to return false until phototransistor hardware is installed.
+bool isAcPhysicallyOn() {
+  // TODO: Future implementation: Read GPIO connected to phototransistor circuit
+  // e.g., return (digitalRead(kPhototransistorPin) == HIGH);
+  return false;
+}
+
+// Returns true if the physical AC state matches the desired target power state.
+// If TRUE, the controller confirms the command succeeded and halts further retries.
+// If FALSE, the controller retries transmitting the command up to kMaxPowerAttempts times.
+bool isPowerCommandVerified(bool target_power) {
+  // TODO: Future implementation with phototransistor:
+  // return (isAcPhysicallyOn() == target_power);
+  //
+  // Currently hardcoded to return false until hardware is wired up.
+  // This causes all ON/OFF commands to reliably fire all kMaxPowerAttempts (5) times.
+  return false;
+}
+
+// -----------------------------------------------------------------------------
+// Power Command Retry State Machine (Non-blocking)
+// -----------------------------------------------------------------------------
+
+struct PowerRetryState {
+  bool active;
+  bool target_power;
+  int attempts_left;
+  uint32_t last_attempt_ms;
+  int protocol_id;
+  uint8_t temp;
+  String mode;
+  String fan;
+  const char* source;
+};
+
+static PowerRetryState s_power_retry = { false, false, 0, 0, -1, 24, "cool", "auto", "manual" };
+
+void cancelPowerRetries() {
+  s_power_retry.active = false;
+}
+
+void updatePowerRetryLoop(GlobalState& state) {
+  if (!s_power_retry.active) return;
+
+  uint32_t now = millis();
+  if (now - s_power_retry.last_attempt_ms < kPowerRetryIntervalMs) return;
+
+  s_power_retry.last_attempt_ms = now;
+
+  // Pre-check feedback sensor before sending next attempt
+  if (isPowerCommandVerified(s_power_retry.target_power)) {
+    Serial.println("[FEEDBACK] Power state verified by hardware sensor. Stopping retries.");
+    s_power_retry.active = false;
+    return;
+  }
+
+  // Ensure minimum IR interval between transmissions
+  if (!canSendIrNow()) return;
+
+  int attemptNum = kMaxPowerAttempts - s_power_retry.attempts_left + 1;
+  Serial.printf("[CMD] Power %s retry (%d/%d, source: %s)\n",
+                s_power_retry.target_power ? "ON" : "OFF",
+                attemptNum, kMaxPowerAttempts, s_power_retry.source);
+
+  sendIrCommand(s_power_retry.protocol_id,
+                s_power_retry.target_power,
+                s_power_retry.temp,
+                s_power_retry.mode,
+                s_power_retry.fan);
+
+  s_power_retry.attempts_left--;
+
+  // Post-check feedback sensor immediately after burst
+  if (isPowerCommandVerified(s_power_retry.target_power)) {
+    Serial.println("[FEEDBACK] Power state confirmed by sensor after retry. Stopping retries.");
+    s_power_retry.active = false;
+    return;
+  }
+
+  if (s_power_retry.attempts_left <= 0) {
+    s_power_retry.active = false;
+    Serial.printf("[CMD] Completed all %d attempts for power %s\n",
+                  kMaxPowerAttempts, s_power_retry.target_power ? "ON" : "OFF");
+  }
+}
+
 bool executePowerCommand(GlobalState& state, bool turn_on, const char* source) {
   if (state.active_protocol_id < 0) {
     Serial.println("[IR] Error: No protocol configured");
     return false;
   }
+
+  // Reset any prior in-progress power retries when a new command arrives
+  cancelPowerRetries();
 
   // Ensure minimum interval between sends
   uint32_t waitMs = getMsUntilIrAllowed();
@@ -269,6 +363,7 @@ bool executePowerCommand(GlobalState& state, bool turn_on, const char* source) {
     delay(waitMs);
   }
 
+  // Attempt 1: Transmit initial IR command immediately
   if (!sendIrCommand(state.active_protocol_id, turn_on, state.ac.temp, state.ac.mode, state.ac.fan)) {
     return false;
   }
@@ -301,8 +396,29 @@ bool executePowerCommand(GlobalState& state, bool turn_on, const char* source) {
   state.last_cmd = entry;
   state.has_last_cmd = true;
 
-  Serial.printf("[CMD] Power %s (source: %s, temp: %d, mode: %s, fan: %s)\n",
-                turn_on ? "ON" : "OFF", source, state.ac.temp, state.ac.mode.c_str(), state.ac.fan.c_str());
+  Serial.printf("[CMD] Power %s (source: %s, attempt 1/%d, temp: %d, mode: %s, fan: %s)\n",
+                turn_on ? "ON" : "OFF", source, kMaxPowerAttempts, state.ac.temp, state.ac.mode.c_str(), state.ac.fan.c_str());
+
+  // Check hardware feedback sensor
+  if (isPowerCommandVerified(turn_on)) {
+    Serial.println("[FEEDBACK] Power state verified by hardware sensor. No retries needed.");
+    return true;
+  }
+
+  // If unconfirmed (or phototransistor not yet wired up):
+  // Queue remaining retries spaced kPowerRetryIntervalMs apart in non-blocking loop
+  s_power_retry.active = true;
+  s_power_retry.target_power = turn_on;
+  s_power_retry.attempts_left = kMaxPowerAttempts - 1; // 4 more attempts for a total of 5
+  s_power_retry.last_attempt_ms = millis();
+  s_power_retry.protocol_id = state.active_protocol_id;
+  s_power_retry.temp = state.ac.temp;
+  s_power_retry.mode = state.ac.mode;
+  s_power_retry.fan = state.ac.fan;
+  s_power_retry.source = source;
+
+  Serial.printf("[CMD] Feedback unconfirmed, queuing %d retries spaced %ums apart.\n",
+                s_power_retry.attempts_left, kPowerRetryIntervalMs);
 
   return true;
 }

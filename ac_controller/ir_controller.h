@@ -22,8 +22,16 @@ void markIrSent();
 // Send IR AC signal
 bool sendIrCommand(int protocol_id, bool power, uint8_t temp, const String& mode, const String& fan);
 
-// High-level power execution (updates state, log, last_cmd, NVS)
+// Hardware feedback sensor (phototransistor) functions
+bool isAcPhysicallyOn();
+bool isPowerCommandVerified(bool target_power);
+
+// High-level power execution (updates state, log, last_cmd, NVS, initiates retries if unconfirmed)
 bool executePowerCommand(GlobalState& state, bool turn_on, const char* source);
+
+// Non-blocking power retry loop and cancellation
+void updatePowerRetryLoop(GlobalState& state);
+void cancelPowerRetries();
 
 // Auto-scan routines
 void startAutoScan(GlobalState& state, uint8_t interval_s);

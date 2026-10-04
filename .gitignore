@@ -16,6 +16,8 @@
 # Compiled binaries
 *.bin
 *.elf
+build/
+ac_controller/build/
 
 # Python cache
 __pycache__/

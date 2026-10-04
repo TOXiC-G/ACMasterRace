@@ -1,0 +1,74 @@
+name: Build and Send Firmware to Discord
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-send:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Rebuild Web Dashboard Header
+        run: python build_html.py
+
+      - name: Generate secrets.h from GitHub Secrets
+        run: |
+          cat << 'EOF' > ac_controller/secrets.h
+          #pragma once
+          #define WIFI_SSID "${{ secrets.WIFI_SSID }}"
+          #define WIFI_PASSWORD "${{ secrets.WIFI_PASSWORD }}"
+          #define DEVICE_HOSTNAME "ac"
+          #define USE_STATIC_IP 0
+          #define STATIC_IP_ADDR 192, 168, 1, 150
+          #define STATIC_GATEWAY 192, 168, 1, 1
+          #define STATIC_SUBNET 255, 255, 255, 0
+          #define STATIC_DNS1 1, 1, 1, 1
+          #define STATIC_DNS2 8, 8, 8, 8
+          EOF
+
+      - name: Compile ESP32-C3 Firmware
+        run: pio run
+
+      - name: Send Binary to Private Discord Channel
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "::error::DISCORD_WEBHOOK secret is missing in GitHub repository settings!"
+            exit 1
+          fi
+
+          COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1)
+
+          curl -s -S -X POST \
+            -F "file=@.pio/build/esp32-c3/firmware.bin;filename=firmware-${COMMIT_SHORT}.bin" \
+            -F "payload_json={
+              \"embeds\": [{
+                \"title\": \"🚀 AC Controller Firmware Update Ready!\",
+                \"description\": \"A new build has been compiled and is ready for Over-The-Air flashing.\",
+                \"color\": 3066993,
+                \"fields\": [
+                  {\"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHORT}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) - ${COMMIT_MSG}\", \"inline\": false},
+                  {\"name\": \"Triggered By\", \"value\": \"${{ github.actor }}\", \"inline\": true},
+                  {\"name\": \"Branch\", \"value\": \"\`${{ github.ref_name }}\`\", \"inline\": true},
+                  {\"name\": \"How to Flash\", \"value\": \"1. Download the attached \`.bin\` file\\n2. Go to **http://ac.local/update**\\n3. Drop file and click **Flash Firmware**\", \"inline\": false}
+                ],
+                \"footer\": {\"text\": \"ACMasterRace Private Cloud Builder\"},
+                \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              }]
+            }" \
+            "$DISCORD_WEBHOOK"
