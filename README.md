@@ -9,6 +9,7 @@ Firmware for an ESP32-C3 (Super Mini class) microcontroller to control a window 
 ### Components
 - **Microcontroller**: ESP32-C3 Super Mini (or standard ESP32-C3 Dev Module)
 - **IR Transmitter Module**: Standard 38 kHz 3-pin IR LED transmitter breakout (with on-board current-limiting resistor)
+- **Optical Feedback Sensor (Optional)**: Phototransistor aligned with the AC unit's power/run LED to confirm physical state
 - **Power**: 5V USB-C power supply or adapter
 
 ### Wiring Diagram
@@ -103,6 +104,17 @@ You can also flash firmware without PlatformIO, Arduino IDE, or USB cables:
 2. Open **[http://ac.local/update](http://ac.local/update)** (or click **OTA Update** in the dashboard footer).
 3. Drop the `firmware.bin` file and click **Flash Firmware**. The ESP will update and reboot automatically in 5 seconds.
 
+### Option D: Cloud Builds via GitHub Actions & Private Discord Delivery
+You can build the firmware without any local compiler tools installed:
+1. Add your repository secrets in GitHub (**Settings > Secrets and variables > Actions**):
+   - `WIFI_SSID`: Your Wi-Fi network name
+   - `WIFI_PASSWORD`: Your Wi-Fi password
+   - `DISCORD_WEBHOOK`: Webhook URL for a private Discord channel
+2. Every push to `main` (or manual trigger under the **Actions** tab) automatically compiles the firmware.
+3. The compiled `firmware.bin` is sent directly to your private Discord channel.
+4. Download the attached `.bin` file on your phone or laptop and upload it to **http://ac.local/update**.
+> **Privacy Note**: To prevent leaking plain-text Wi-Fi passwords from the binary's `.rodata` section on a public repository, the workflow never uploads public artifacts to GitHub. The binary is sent exclusively to your private Discord webhook.
+
 #### ESP32-C3 Super Mini Bootloader Note
 If the board fails to enter download mode automatically during initial USB upload:
 1. Press and hold the **BOOT** button (labeled `B` or `0` on the Super Mini).
@@ -132,6 +144,7 @@ In [`API.md`](file:///h:/Dev/AC/API.md), schedules specify `days` as a 7-element
 - **Recovery & Redundancy**:
   - An **OFF** schedule event is always sent via IR even if the assumed state is already OFF (ensuring physical units recover if missed).
   - An **ON** schedule event is skipped only if the AC is already assumed ON and an identical ON command was sent less than 60 seconds prior.
+  - **5x Power Burst Engine**: Every power command (manual button, sleep timer, or schedule) automatically fires up to 5 full-frame IR transmissions spaced 1 second apart (`kMaxPowerAttempts = 5`, `kPowerRetryIntervalMs = 1000`) unless verified earlier by the optical feedback sensor. This eliminates missed signals due to distance or angle.
 
 ---
 

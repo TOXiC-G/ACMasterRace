@@ -50,13 +50,15 @@ This document defines the HTTP JSON API contract between the single-file web cli
     }
   }
   ```
-  *(Note: `timer` is `null` when no sleep timer is active. `last_cmd` is `null` if no commands have been executed yet. `protocol` is `null` if no AC brand protocol has been selected yet).*
+  *(Note: `confirmed` reflects the hardware feedback sensor (`isPowerCommandVerified()`). It is `false` when no sensor is installed, and becomes `true` when physical AC state matches assumed state. `timer` is `null` when no sleep timer is active. `last_cmd` is `null` if no commands have been executed yet. `protocol` is `null` if no AC brand protocol has been selected yet).*
 
 ---
 
 ### 2.2 Toggle Power
 - **Route**: `POST /api/power`
 - **Description**: Transmits an IR command to power the AC unit on or off. Updates the internal assumed state and appends an entry to the command log.
+- **Redundancy & Retries**: Fires the initial IR command immediately and returns HTTP 200. If physical power is unverified, background retries continue non-blockingly at 1-second intervals up to **5 total attempts** (`kMaxPowerAttempts = 5`), ensuring reliable delivery without blocking HTTP requests.
+- **Sleep Timer Interaction**: If power is toggled `"off"` manually while a sleep timer is running, the timer is cancelled and cleared immediately.
 - **Request Body**:
   ```json
   { "on": true }

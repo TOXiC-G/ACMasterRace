@@ -52,6 +52,7 @@ The device hosts its own single-file web dashboard directly from flash memory an
 | [`ac_controller/web_server.h`](file:///h:/Dev/AC/ac_controller/web_server.h) / `.cpp` | REST API routes (`/api/*`), CORS handlers, and Web OTA firmware upload endpoints (`/update`). |
 | [`ac_controller/secrets.h.example`](file:///h:/Dev/AC/ac_controller/secrets.h.example) | Template for local Wi-Fi credentials and static IP config. Local `secrets.h` is git-ignored. |
 | [`platformio.ini`](file:///h:/Dev/AC/platformio.ini) | PlatformIO project configuration: ESP32-C3 board settings, USB CDC on boot, `min_spiffs.csv` dual-OTA partition scheme. |
+| [`.github/workflows/build_and_send.yml`](file:///h:/Dev/AC/.github/workflows/build_and_send.yml) | GitHub Actions CI/CD workflow: compiles firmware in cloud and posts binary directly to private Discord channel. |
 | [`API.md`](file:///h:/Dev/AC/API.md) | Exhaustive documentation of all REST API routes, schemas, request/response examples, and error codes. |
 | [`README.md`](file:///h:/Dev/AC/README.md) | User-facing setup, wiring, flashing, OTA, and Tailscale usage instructions. |
 
@@ -87,6 +88,13 @@ This updates [`ac_controller/index_html.h`](file:///h:/Dev/AC/ac_controller/inde
 - In Arduino IDE, always select `Minimal SPIFFS (Large APPS with OTA)`.
 - Never shrink the app partition below the binary size (~1.2 MB compiled with IR and JSON libraries).
 
+### Rule 6: Power Command Redundancy & Optical Feedback Verification
+- All power commands (manual UI clicks, schedules, sleep timer expiry, boot catch-up) must pass through `executePowerCommand()`.
+- **5x Retries**: Because IR transmissions can be dropped by distance, angle, or ambient noise, power commands fire `kMaxPowerAttempts = 5` times spaced `kPowerRetryIntervalMs = 1000ms` apart.
+- **Feedback Verification**: Before and after each retry attempt, `isPowerCommandVerified(target_power)` checks physical state. If verified (`true`), retries halt immediately. While hardware is uninstalled, it returns `false`, guaranteeing all 5 attempts fire.
+- **Non-Blocking Loop**: Retries run asynchronously in `loop()` via `updatePowerRetryLoop()`. Never introduce blocking delays in request handlers.
+- **Full Frames (`nullptr`)**: In `sendIrCommand()`, always pass `nullptr` to `s_irac.sendAc(desired, nullptr)` to prevent `IRac` from suppressing duplicate power frames or delta-optimizing away state.
+
 ---
 
 ## 4. Frontend & Testing Conventions
@@ -108,3 +116,14 @@ This updates [`ac_controller/index_html.h`](file:///h:/Dev/AC/ac_controller/inde
 - **Default Protocol**: The active protocol defaults to **`Gree (model 2)`** (`decode_type_t::GREE`, model `2 /* YBOFB */`). This protocol is widely used by Indian market Voltas window/split air conditioners.
 - **Hardware Pin**: Driven directly via **GPIO 4** (`kIrLedPin = 4`). Can be changed in [`ac_controller/config.h`](file:///h:/Dev/AC/ac_controller/config.h).
 - **USB CDC on Boot**: The ESP32-C3 Super Mini requires `-D ARDUINO_USB_MODE=1` and `-D ARDUINO_USB_CDC_ON_BOOT=1` in build flags to enable serial console output over the native USB Type-C port.
+- **Phototransistor Feedback Sensor**: Stubs [`isAcPhysicallyOn()`](file:///h:/Dev/AC/ac_controller/ir_controller.cpp) and [`isPowerCommandVerified()`](file:///h:/Dev/AC/ac_controller/ir_controller.cpp) are implemented for future optical feedback (sensing AC power/run LED). When hardware is installed, update `isAcPhysicallyOn()` with `digitalRead(kPhototransistorPin)`.
+
+---
+
+## 6. CI/CD & Private Discord Builds
+
+- **Automated Cloud Builds**: [`.github/workflows/build_and_send.yml`](file:///h:/Dev/AC/.github/workflows/build_and_send.yml) compiles firmware on push to `main` or manual `workflow_dispatch`.
+- **Direct Discord Delivery**: The compiled `firmware.bin` is sent directly to a private Discord channel via `DISCORD_WEBHOOK`.
+- **Public Repo Security**: Because strings like `WIFI_PASSWORD` exist in plain text inside compiled `.rodata`, the workflow **never** uploads public artifacts to GitHub. The binary is solely delivered to the private Discord webhook.
+- **Required Secrets**: `WIFI_SSID`, `WIFI_PASSWORD`, `DISCORD_WEBHOOK`.
+
