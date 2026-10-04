@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-and-send:
     runs-on: ubuntu-latest
@@ -18,8 +21,8 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install PlatformIO
-        run: pip install platformio
+      - name: Install PlatformIO & Cryptography
+        run: pip install platformio cryptography
 
       - name: Rebuild Web Dashboard Header
         run: python build_html.py
@@ -42,13 +45,64 @@ jobs:
       - name: Compile ESP32-C3 Firmware
         run: pio run
 
+      - name: Encrypt Firmware for Browser OTA (AES-256-GCM)
+        id: encrypt
+        env:
+          OTA_PASSWORD: ${{ secrets.OTA_PASSWORD || secrets.WIFI_PASSWORD }}
+        run: |
+          python -c '
+          import os, sys
+          from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+          from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+          from cryptography.hazmat.primitives import hashes
+
+          pwd = os.environ.get("OTA_PASSWORD", "").strip()
+          if not pwd:
+              print("Warning: OTA_PASSWORD and WIFI_PASSWORD are empty, using default fallback key")
+              pwd = "acmasterrace"
+
+          salt = os.urandom(16)
+          kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=100000)
+          key = kdf.derive(pwd.encode("utf-8"))
+
+          iv = os.urandom(12)
+          aesgcm = AESGCM(key)
+
+          with open(".pio/build/esp32-c3/firmware.bin", "rb") as f:
+              plaintext = f.read()
+
+          ciphertext = aesgcm.encrypt(iv, plaintext, None)
+
+          with open("firmware.enc", "wb") as f:
+              f.write(salt + iv + ciphertext)
+
+          print(f"Encrypted firmware.bin ({len(plaintext)} bytes) -> firmware.enc ({len(salt) + len(iv) + len(ciphertext)} bytes)")
+          '
+
+      - name: Publish Encrypted Release Asset
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: latest
+          name: "Cloud Build: ${{ github.sha }}"
+          body: |
+            Automated encrypted cloud build for ACMasterRace.
+            * **Commit**: `${{ github.sha }}`
+            * **Branch**: `${{ github.ref_name }}`
+            * **Author**: `${{ github.actor }}`
+
+            > **Notice**: The attached `firmware.enc` file is AES-256-GCM encrypted for private, authorized use by the device owner and collaborators. It can be decrypted and flashed directly through the ACMasterRace dashboard.
+          files: firmware.enc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Send Binary to Private Discord Channel
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           if [ -z "$DISCORD_WEBHOOK" ]; then
-            echo "::error::DISCORD_WEBHOOK secret is missing in GitHub repository settings!"
-            exit 1
+            echo "::warning::DISCORD_WEBHOOK secret not set. Skipping Discord notification."
+            exit 0
           fi
 
           COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
@@ -65,7 +119,7 @@ jobs:
                   {\"name\": \"Commit\", \"value\": \"[\`${COMMIT_SHORT}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }}) - ${COMMIT_MSG}\", \"inline\": false},
                   {\"name\": \"Triggered By\", \"value\": \"${{ github.actor }}\", \"inline\": true},
                   {\"name\": \"Branch\", \"value\": \"\`${{ github.ref_name }}\`\", \"inline\": true},
-                  {\"name\": \"How to Flash\", \"value\": \"1. Download the attached \`.bin\` file\\n2. Go to **http://ac.local/update**\\n3. Drop file and click **Flash Firmware**\", \"inline\": false}
+                  {\"name\": \"How to Flash\", \"value\": \"1. Download the attached \`.bin\` file\\n2. Go to **http://ac.local/update**\\n3. Drop file and click **Flash Firmware**\\n*Or use the 1-click Cloud Update inside the dashboard!*\", \"inline\": false}
                 ],
                 \"footer\": {\"text\": \"ACMasterRace Private Cloud Builder\"},
                 \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"

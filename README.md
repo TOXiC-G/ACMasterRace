@@ -104,16 +104,22 @@ You can also flash firmware without PlatformIO, Arduino IDE, or USB cables:
 2. Open **[http://ac.local/update](http://ac.local/update)** (or click **OTA Update** in the dashboard footer).
 3. Drop the `firmware.bin` file and click **Flash Firmware**. The ESP will update and reboot automatically in 5 seconds.
 
-### Option D: Cloud Builds via GitHub Actions & Private Discord Delivery
-You can build the firmware without any local compiler tools installed:
+### Option D: Cloud Builds & 1-Click In-Browser Cloud Updates
+You can build and flash firmware without any local compiler tools installed:
 1. Add your repository secrets in GitHub (**Settings > Secrets and variables > Actions**):
    - `WIFI_SSID`: Your Wi-Fi network name
    - `WIFI_PASSWORD`: Your Wi-Fi password
-   - `DISCORD_WEBHOOK`: Webhook URL for a private Discord channel
-2. Every push to `main` (or manual trigger under the **Actions** tab) automatically compiles the firmware.
-3. The compiled `firmware.bin` is sent directly to your private Discord channel.
-4. Download the attached `.bin` file on your phone or laptop and upload it to **http://ac.local/update**.
-> **Privacy Note**: To prevent leaking plain-text Wi-Fi passwords from the binary's `.rodata` section on a public repository, the workflow never uploads public artifacts to GitHub. The binary is sent exclusively to your private Discord webhook.
+   - `DISCORD_WEBHOOK`: Webhook URL for your private Discord channel
+   - `OTA_PASSWORD` *(optional)*: Dedicated decryption passphrase (defaults to `WIFI_PASSWORD`)
+2. Every push to `main` (or manual trigger under the **Actions** tab) automatically:
+   - Delivers the raw `firmware.bin` to your private Discord channel.
+   - Encrypts `firmware.bin` with AES-256-GCM into `firmware.enc` and publishes it to GitHub Releases (`latest`).
+3. **To update from your phone or browser**:
+   - Open your dashboard at **http://ac.local** and click **OTA Update** in the footer.
+   - Click **Check GitHub**, enter your decryption password, and click **Download, Decrypt & Flash**.
+   - Your browser downloads the encrypted package, authenticates and decrypts it locally via Web Crypto API, streams it to the ESP32, and automatically reconnects after reboot!
+   - *Alternatively, you can drop the `.bin` from Discord into the local file picker.*
+> **Privacy Note**: Because strings like `WIFI_PASSWORD` exist in plain text inside `.rodata`, the public release asset is always AES-256 encrypted. Only someone with your decryption password can extract or flash the binary.
 
 #### ESP32-C3 Super Mini Bootloader Note
 If the board fails to enter download mode automatically during initial USB upload:

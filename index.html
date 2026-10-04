@@ -469,7 +469,7 @@ details[open] .chevron { transform: rotate(180deg); }
       <div class="footer-sub between">
         <button type="button" id="btn-open-logs" class="link-btn" aria-label="View command log">Command Log</button>
         <div class="row" style="gap: 12px; align-items: center;">
-          <a href="/update" class="link-btn" style="text-decoration:none; font-size:12px; color:var(--text-muted);" title="Over-The-Air Firmware Update">OTA Update</a>
+          <button type="button" id="btn-open-ota" class="link-btn" style="text-decoration:none; font-size:12px; color:var(--text-muted);" title="Over-The-Air Firmware Update">OTA Update</button>
           <span id="wifi-rssi" class="wifi-tag" title="Wi-Fi Signal">- dBm</span>
         </div>
       </div>
@@ -542,6 +542,76 @@ details[open] .chevron { transform: rotate(180deg); }
       <button type="button" id="btn-close-log" class="btn btn-ghost btn-sm" aria-label="Close">&times;</button>
     </div>
     <div id="log-list" class="col"></div>
+  </div>
+  <!-- OTA Firmware Update Bottom Sheet -->
+  <div id="ota-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="ota-title" hidden>
+    <div class="sheet-head between">
+      <h3 id="ota-title" class="sheet-title">Firmware Update (OTA)</h3>
+      <button type="button" id="btn-close-ota" class="btn btn-ghost btn-sm" aria-label="Close">&times;</button>
+    </div>
+
+    <!-- 1. Cloud Release Update (Encrypted Asset) -->
+    <div class="card col" style="padding:14px; gap:10px;">
+      <div class="between" style="align-items:center;">
+        <div>
+          <div style="font-weight:600; font-size:13px;">Cloud Release Update</div>
+          <div style="font-size:11px; color:var(--text-muted);">Decrypts AES-256 package in your browser</div>
+        </div>
+        <button type="button" id="btn-check-cloud-ota" class="btn btn-ghost btn-sm" style="font-size:11px; padding:4px 10px;">Check GitHub</button>
+      </div>
+
+      <div id="ota-cloud-status" style="font-size:12px; color:var(--text-muted); text-align:center; padding:6px 0;">
+        Tap "Check GitHub" to search for new builds
+      </div>
+
+      <!-- Cloud status / Release details (shown when checked) -->
+      <div id="ota-cloud-info" class="col" style="gap:10px; display:none;">
+        <div class="between" style="font-size:12px; background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:6px; border:1px solid var(--border); align-items:center;">
+          <div>
+            <div id="ota-release-tag" style="font-weight:700; color:var(--accent);">latest</div>
+            <div id="ota-release-date" style="font-size:11px; color:var(--text-muted); margin-top:2px;"></div>
+          </div>
+          <span id="ota-release-size" style="font-size:11px; color:var(--text-muted); font-weight:600;"></span>
+        </div>
+
+        <div class="col" style="gap:4px;">
+          <label for="ota-pwd" class="ctrl-label" style="margin:0;">Decryption Key (Password)</label>
+          <div class="row" style="gap:6px;">
+            <input type="password" id="ota-pwd" class="input-field" placeholder="Enter OTA password" style="flex:1;">
+            <button type="button" id="btn-toggle-ota-pwd" class="btn btn-ghost btn-sm" title="Show/Hide Password" style="padding:0 8px;">👁</button>
+          </div>
+          <label class="row" style="gap:6px; font-size:11px; color:var(--text-muted); align-items:center; cursor:pointer; margin-top:2px;">
+            <input type="checkbox" id="ota-remember-pwd" checked>
+            <span>Remember password on this device</span>
+          </label>
+        </div>
+
+        <button type="button" id="btn-start-cloud-ota" class="btn btn-accent" style="width:100%;">
+          ⚡ Download, Decrypt & Flash
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. Active Flashing Progress / Countdown Card -->
+    <div id="ota-progress-box" class="card col" style="padding:14px; gap:8px; display:none;">
+      <div class="between" style="font-size:13px; font-weight:600;">
+        <span id="ota-progress-label">Preparing update...</span>
+        <span id="ota-progress-pct" style="color:var(--accent);">0%</span>
+      </div>
+      <div style="background:rgba(255,255,255,0.08); border-radius:4px; height:8px; overflow:hidden;">
+        <div id="ota-progress-bar" style="background:var(--accent); width:0%; height:100%; transition:width 150ms ease;"></div>
+      </div>
+      <div id="ota-progress-sub" style="font-size:11px; color:var(--text-muted);">Do not power off your ESP32 controller.</div>
+    </div>
+
+    <!-- 3. Local Binary Upload (Fallback) -->
+    <details style="font-size:12px; margin-top:2px;">
+      <summary style="color:var(--text-muted); cursor:pointer; font-weight:500;">Or upload local .bin file</summary>
+      <div class="col" style="gap:8px; padding-top:10px;">
+        <input type="file" id="ota-local-file" accept=".bin" style="font-size:12px;">
+        <button type="button" id="btn-flash-local" class="btn btn-ghost btn-sm" disabled>Flash Local File</button>
+      </div>
+    </details>
   </div>
   <div id="toasts" class="toast-box" aria-live="assertive"></div>
 <script>
@@ -1235,14 +1305,18 @@ details[open] .chevron { transform: rotate(180deg); }
       }
       function closeModals() {
         $('backdrop').classList.remove('open');
-        [$('sched-sheet'), $('log-sheet')].forEach((m) => {
+        [$('sched-sheet'), $('log-sheet'), $('ota-sheet')].forEach((m) => {
         m.classList.remove('open');
         setTimeout(() => { m.hidden = true; }, 220);
         });
       }
       $('backdrop').onclick = closeModals;
-      ['btn-close-sched', 'btn-cancel-sched', 'btn-close-log'].forEach((id) => $(id).onclick = closeModals);
+      ['btn-close-sched', 'btn-cancel-sched', 'btn-close-log', 'btn-close-ota'].forEach((id) => {
+        const btn = $(id);
+        if (btn) btn.onclick = closeModals;
+      });
       $('btn-add-sched').onclick = () => openSchedModal(null);
+      $('btn-open-ota').onclick = () => openModal($('ota-sheet'));
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModals(); });
       // --- 13. Polling, Visibility & Offline Retry ---
       async function poll() {
@@ -1287,7 +1361,277 @@ details[open] .chevron { transform: rotate(180deg); }
         };
       }
       $('btn-conn-dot').onclick = () => { if (isMock && mockOfflineBtn) mockOfflineBtn.click(); };
-      // --- 14. Init ---
+      // --- 14. In-Browser Client-Side Decryption & OTA Engine ---
+      let cloudAssetUrl = null;
+
+      async function decryptFirmware(encBuffer, password) {
+        if (encBuffer.byteLength < 28) throw new Error('Encrypted file format invalid (file too small)');
+        const salt = encBuffer.slice(0, 16);
+        const iv = encBuffer.slice(16, 28);
+        const ciphertext = encBuffer.slice(28);
+
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey(
+          'raw',
+          enc.encode(password),
+          { name: 'PBKDF2' },
+          false,
+          ['deriveKey']
+        );
+
+        const key = await crypto.subtle.deriveKey(
+          {
+            name: 'PBKDF2',
+            salt: salt,
+            iterations: 100000,
+            hash: 'SHA-256'
+          },
+          keyMaterial,
+          { name: 'AES-GCM', length: 256 },
+          false,
+          ['decrypt']
+        );
+
+        return await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: iv },
+          key,
+          ciphertext
+        );
+      }
+
+      function uploadFirmwareBinary(rawArrayBuffer, fileName = 'firmware.bin') {
+        const pBox = $('ota-progress-box');
+        const pLabel = $('ota-progress-label');
+        const pPct = $('ota-progress-pct');
+        const pBar = $('ota-progress-bar');
+        const pSub = $('ota-progress-sub');
+
+        pBox.style.display = 'flex';
+        pBar.style.width = '10%';
+        pBar.style.background = 'var(--accent)';
+        pPct.textContent = '0%';
+        pLabel.textContent = 'Connecting to ESP32...';
+
+        if (isMock) {
+          let mockP = 0;
+          const mid = setInterval(() => {
+            mockP += 20;
+            pPct.textContent = mockP + '%';
+            pBar.style.width = mockP + '%';
+            pLabel.textContent = `Uploading: ${mockP}%`;
+            if (mockP >= 100) {
+              clearInterval(mid);
+              pBar.style.background = 'var(--success)';
+              pLabel.innerHTML = '<span style="color:var(--success)">Mock Update Complete!</span>';
+              pSub.textContent = 'Device simulated restart.';
+              showToast('Mock firmware update succeeded!');
+              setTimeout(closeModals, 2000);
+            }
+          }, 200);
+          return;
+        }
+
+        const blob = new Blob([rawArrayBuffer], { type: 'application/octet-stream' });
+        const fd = new FormData();
+        fd.append('firmware', blob, fileName);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/update', true);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            pPct.textContent = pct + '%';
+            pBar.style.width = pct + '%';
+            pLabel.textContent = `Uploading: ${pct}%`;
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            pBar.style.width = '100%';
+            pBar.style.background = 'var(--success)';
+            pPct.textContent = '100%';
+            pLabel.innerHTML = '<span style="color:var(--success)">Update Successful!</span>';
+
+            let countdown = 6;
+            pSub.textContent = `ESP32 rebooting. Reconnecting in ${countdown}s...`;
+            const cid = setInterval(() => {
+              countdown--;
+              if (countdown > 0) {
+                pSub.textContent = `ESP32 rebooting. Reconnecting in ${countdown}s...`;
+              } else {
+                clearInterval(cid);
+                pSub.textContent = 'Reconnecting to dashboard...';
+                let retries = 15;
+                const pid = setInterval(async () => {
+                  try {
+                    const s = await api('/api/state');
+                    clearInterval(pid);
+                    render(s);
+                    setOnline(true);
+                    showToast('Controller online with new firmware!');
+                    setTimeout(closeModals, 1200);
+                  } catch (_) {
+                    if (--retries <= 0) {
+                      clearInterval(pid);
+                      pSub.textContent = 'Reboot completed. Please refresh the page.';
+                    }
+                  }
+                }, 1000);
+              }
+            }, 1000);
+          } else {
+            pBar.style.background = 'var(--danger)';
+            pLabel.innerHTML = '<span style="color:var(--danger)">Flash Failed!</span>';
+            pSub.textContent = xhr.responseText || `HTTP error ${xhr.status}`;
+            showToast('Flash upload failed');
+          }
+        };
+
+        xhr.onerror = () => {
+          pBar.style.background = 'var(--danger)';
+          pLabel.innerHTML = '<span style="color:var(--danger)">Connection Lost</span>';
+          pSub.textContent = 'Network disconnected during upload.';
+          showToast('Upload disconnected');
+        };
+
+        xhr.send(fd);
+      }
+
+      // Check Cloud Release
+      $('btn-check-cloud-ota').onclick = async () => {
+        const statusEl = $('ota-cloud-status');
+        const infoEl = $('ota-cloud-info');
+        statusEl.textContent = 'Checking GitHub Releases...';
+        statusEl.style.display = 'block';
+        infoEl.style.display = 'none';
+
+        try {
+          let release;
+          if (isMock) {
+            await new Promise(r => setTimeout(r, 600));
+            release = {
+              tag_name: 'latest',
+              name: 'Cloud Build: 42c5ff9',
+              published_at: new Date().toISOString(),
+              assets: [{ name: 'firmware.enc', size: 1273148, browser_download_url: 'mock://firmware.enc' }]
+            };
+          } else {
+            const res = await fetch('https://api.github.com/repos/TOXiC-G/ACMasterRace/releases/latest');
+            if (!res.ok) {
+              if (res.status === 404) throw new Error('No cloud releases published yet.');
+              throw new Error(`GitHub API error: ${res.status}`);
+            }
+            release = await res.json();
+          }
+
+          const encAsset = release.assets?.find(a => a.name === 'firmware.enc');
+          if (!encAsset) {
+            statusEl.innerHTML = '<span style="color:var(--danger)">No encrypted binary (<code>firmware.enc</code>) found in latest release.</span>';
+            return;
+          }
+
+          cloudAssetUrl = encAsset.browser_download_url;
+          $('ota-release-tag').textContent = release.name || release.tag_name;
+          $('ota-release-date').textContent = new Date(release.published_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          $('ota-release-size').textContent = (encAsset.size / (1024 * 1024)).toFixed(2) + ' MB';
+
+          const savedPwd = localStorage.getItem('ac_ota_pwd');
+          if (savedPwd) $('ota-pwd').value = savedPwd;
+
+          statusEl.style.display = 'none';
+          infoEl.style.display = 'flex';
+        } catch (err) {
+          statusEl.innerHTML = `<span style="color:var(--danger)">${err.message || 'Check failed'}</span>`;
+        }
+      };
+
+      // Toggle Password Visibility
+      $('btn-toggle-ota-pwd').onclick = () => {
+        const inp = $('ota-pwd');
+        inp.type = (inp.type === 'password') ? 'text' : 'password';
+      };
+
+      // Start Cloud Decrypt & Flash
+      $('btn-start-cloud-ota').onclick = async () => {
+        const pwd = $('ota-pwd').value.trim();
+        if (!pwd) {
+          showToast('Please enter your decryption password');
+          $('ota-pwd').focus();
+          return;
+        }
+
+        if ($('ota-remember-pwd').checked) {
+          localStorage.setItem('ac_ota_pwd', pwd);
+        } else {
+          localStorage.removeItem('ac_ota_pwd');
+        }
+
+        const pBox = $('ota-progress-box');
+        const pLabel = $('ota-progress-label');
+        const pPct = $('ota-progress-pct');
+        const pBar = $('ota-progress-bar');
+        const pSub = $('ota-progress-sub');
+
+        $('ota-cloud-info').style.display = 'none';
+        pBox.style.display = 'flex';
+        pLabel.textContent = 'Downloading cloud package...';
+        pPct.textContent = '0%';
+        pBar.style.width = '15%';
+        pBar.style.background = 'var(--accent)';
+
+        try {
+          let encBuffer;
+          if (isMock) {
+            await new Promise(r => setTimeout(r, 600));
+            encBuffer = new Uint8Array(100).buffer;
+          } else {
+            const res = await fetch(cloudAssetUrl);
+            if (!res.ok) throw new Error(`Download failed: HTTP ${res.status}`);
+            encBuffer = await res.arrayBuffer();
+          }
+
+          pLabel.textContent = 'Decrypting binary (AES-256-GCM)...';
+          pBar.style.width = '35%';
+
+          let rawBuffer;
+          if (isMock) {
+            await new Promise(r => setTimeout(r, 300));
+            rawBuffer = encBuffer;
+          } else {
+            rawBuffer = await decryptFirmware(encBuffer, pwd);
+          }
+
+          pLabel.textContent = 'Decryption verified! Flashing ESP32...';
+          pBar.style.width = '50%';
+
+          uploadFirmwareBinary(rawBuffer, 'firmware.bin');
+        } catch (err) {
+          pBar.style.background = 'var(--danger)';
+          pLabel.innerHTML = '<span style="color:var(--danger)">Decryption Failed</span>';
+          pSub.textContent = (err.name === 'OperationError') ? 'Incorrect password. Decryption authentication failed.' : (err.message || 'Error occurred');
+          showToast(pSub.textContent);
+          setTimeout(() => {
+            $('ota-cloud-info').style.display = 'flex';
+            pBox.style.display = 'none';
+          }, 3500);
+        }
+      };
+
+      // Local file fallback
+      $('ota-local-file').onchange = () => {
+        $('btn-flash-local').disabled = !$('ota-local-file').files.length;
+      };
+      $('btn-flash-local').onclick = () => {
+        const file = $('ota-local-file').files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => uploadFirmwareBinary(e.target.result, file.name);
+        reader.readAsArrayBuffer(file);
+      };
+
+      // --- 15. Init ---
       Promise.allSettled([poll(), fetchScheds(), pollIr()]);
       startPoll();
       startClock();

@@ -120,10 +120,11 @@ This updates [`ac_controller/index_html.h`](file:///h:/Dev/AC/ac_controller/inde
 
 ---
 
-## 6. CI/CD & Private Discord Builds
+## 6. CI/CD, Discord Builds & In-Browser Cloud OTA
 
 - **Automated Cloud Builds**: [`.github/workflows/build_and_send.yml`](file:///h:/Dev/AC/.github/workflows/build_and_send.yml) compiles firmware on push to `main` or manual `workflow_dispatch`.
-- **Direct Discord Delivery**: The compiled `firmware.bin` is sent directly to a private Discord channel via `DISCORD_WEBHOOK`.
-- **Public Repo Security**: Because strings like `WIFI_PASSWORD` exist in plain text inside compiled `.rodata`, the workflow **never** uploads public artifacts to GitHub. The binary is solely delivered to the private Discord webhook.
-- **Required Secrets**: `WIFI_SSID`, `WIFI_PASSWORD`, `DISCORD_WEBHOOK`.
+- **Direct Discord Delivery**: The compiled unencrypted `firmware.bin` is sent directly to a private Discord channel via `DISCORD_WEBHOOK`.
+- **Encrypted Public Releases (`firmware.enc`)**: To allow 1-click cloud updates without exposing plain-text Wi-Fi credentials from `.rodata`, the workflow encrypts `firmware.bin` with AES-256-GCM (PBKDF2-HMAC-SHA256, 100,000 iterations) into `firmware.enc` and publishes it to GitHub Releases (`latest`).
+- **In-Browser Decryption Engine**: When "Check GitHub" is clicked in the web dashboard, the browser downloads `firmware.enc`, derives the key from the user's password using the native W3C Web Crypto API (`crypto.subtle`), authenticates and decrypts the binary client-side, and streams the clean binary to `/update`.
+- **Required Secrets**: `WIFI_SSID`, `WIFI_PASSWORD`, `DISCORD_WEBHOOK` (optional `OTA_PASSWORD`, defaults to `WIFI_PASSWORD`).
 
