@@ -79,11 +79,23 @@ input { user-select: text; -webkit-user-select: text; }
 /* 1. Header */
 .header { padding: 4px 2px; }
 .brand { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 700; letter-spacing: 0.05em; }
+.version-pill {
+  font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: var(--radius-full);
+  background: rgba(124,140,255,0.14); color: var(--accent); border: 1px solid rgba(124,140,255,0.3);
+  letter-spacing: 0.04em; line-height: 1;
+}
 .mock-tag {
   font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
   background: rgba(124,140,255,0.15); color: var(--accent); border: 1px solid rgba(124,140,255,0.3);
 }
 .header-right { display: flex; align-items: center; gap: 10px; }
+.header-icon-btn {
+  background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+  border-radius: var(--radius-full); width: 30px; height: 30px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: all 180ms ease;
+}
+.header-icon-btn:hover { color: var(--accent); border-color: var(--accent); background: rgba(124,140,255,0.1); }
 .device-clock { font-size: 14px; font-weight: 500; color: var(--text-muted); }
 .conn-btn { background: none; border: none; padding: 6px; cursor: pointer; display: flex; align-items: center; }
 .conn-dot {
@@ -258,9 +270,13 @@ details[open] .chevron { transform: rotate(180deg); }
     <header class="header between">
       <div class="brand">
         <span>AC</span>
+        <span class="version-pill" title="Firmware Release v1.1">v1.1</span>
         <span id="mock-badge" class="mock-tag" hidden>MOCK</span>
       </div>
       <div class="header-right">
+        <button type="button" id="btn-header-ota" class="header-icon-btn" aria-label="Firmware updates" title="OTA Firmware Update">
+          <svg class="icon" viewBox="0 0 24 24" style="width:15px;height:15px;"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/><path d="M12 13v5m2.5-2.5L12 13l-2.5 2.5"/></svg>
+        </button>
         <div id="device-clock" class="device-clock">--:--:--</div>
         <button type="button" id="btn-conn-dot" class="conn-btn" aria-label="Connection: connected" title="Connection status">
         <div id="conn-dot" class="conn-dot"></div>
@@ -1322,8 +1338,10 @@ details[open] .chevron { transform: rotate(180deg); }
         const btn = $(id);
         if (btn) btn.onclick = closeModals;
       });
-      $('btn-add-sched').onclick = () => openSchedModal(null);
-      $('btn-open-ota').onclick = () => openModal($('ota-sheet'));
+      const openOta = () => openModal($('ota-sheet'));
+      $('btn-open-ota').onclick = openOta;
+      const headerOtaBtn = $('btn-header-ota');
+      if (headerOtaBtn) headerOtaBtn.onclick = openOta;
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModals(); });
       // --- 13. Polling, Visibility & Offline Retry ---
       async function poll() {
