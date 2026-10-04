@@ -79,6 +79,34 @@ jobs:
           print(f"Encrypted firmware.bin ({len(plaintext)} bytes) -> firmware.enc ({len(salt) + len(iv) + len(ciphertext)} bytes)")
           '
 
+      - name: Deploy Encrypted Firmware to builds Branch (CORS-friendly OTA)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          mkdir -p /tmp/builds-deploy
+          cp firmware.enc /tmp/builds-deploy/
+
+          COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1)
+
+          cat << EOF > /tmp/builds-deploy/version.json
+          {
+            "tag": "build-${COMMIT_SHORT}",
+            "commit": "${{ github.sha }}",
+            "message": "${COMMIT_MSG}",
+            "date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+          cd /tmp/builds-deploy
+          git init
+          git checkout -b builds
+          git add firmware.enc version.json
+          git commit -m "Auto-deploy encrypted build: ${COMMIT_SHORT}"
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git push -f origin builds
+
       - name: Publish Encrypted Release Asset
         uses: softprops/action-gh-release@v2
         if: success()

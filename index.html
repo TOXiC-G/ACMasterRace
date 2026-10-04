@@ -1503,7 +1503,7 @@ details[open] .chevron { transform: rotate(180deg); }
       $('btn-check-cloud-ota').onclick = async () => {
         const statusEl = $('ota-cloud-status');
         const infoEl = $('ota-cloud-info');
-        statusEl.textContent = 'Checking GitHub Releases...';
+        statusEl.textContent = 'Checking for latest cloud build...';
         statusEl.style.display = 'block';
         infoEl.style.display = 'none';
 
@@ -1512,30 +1512,37 @@ details[open] .chevron { transform: rotate(180deg); }
           if (isMock) {
             await new Promise(r => setTimeout(r, 600));
             release = {
-              tag_name: 'latest',
-              name: 'Cloud Build: 42c5ff9',
-              published_at: new Date().toISOString(),
-              assets: [{ name: 'firmware.enc', size: 1273148, browser_download_url: 'mock://firmware.enc' }]
+              tag: 'build-00a463d',
+              commit: '00a463d68cfa4b5991a7d3466f017e6728556fe7',
+              message: 'Add in-browser AES-256-GCM cloud OTA',
+              date: new Date().toISOString()
             };
+            cloudAssetUrl = 'mock://firmware.enc';
           } else {
-            const res = await fetch('https://api.github.com/repos/TOXiC-G/ACMasterRace/releases/latest');
-            if (!res.ok) {
-              if (res.status === 404) throw new Error('No cloud releases published yet.');
-              throw new Error(`GitHub API error: ${res.status}`);
+            // Fetch version.json from raw.githubusercontent.com (100% CORS-friendly)
+            const rawRes = await fetch(`https://raw.githubusercontent.com/TOXiC-G/ACMasterRace/builds/version.json?t=${Date.now()}`);
+            if (rawRes.ok) {
+              release = await rawRes.json();
+              cloudAssetUrl = `https://raw.githubusercontent.com/TOXiC-G/ACMasterRace/builds/firmware.enc?t=${Date.now()}`;
+            } else {
+              // Fallback to checking GitHub API release
+              const res = await fetch('https://api.github.com/repos/TOXiC-G/ACMasterRace/releases/latest');
+              if (!res.ok) throw new Error('No cloud build found yet. Push a commit or trigger workflow in Actions.');
+              const ghRel = await res.json();
+              const asset = ghRel.assets?.find(a => a.name === 'firmware.enc');
+              if (!asset) throw new Error('No firmware.enc found in release.');
+              release = {
+                tag: ghRel.tag_name || 'latest',
+                message: ghRel.name || 'Release Build',
+                date: ghRel.published_at
+              };
+              cloudAssetUrl = `https://raw.githubusercontent.com/TOXiC-G/ACMasterRace/builds/firmware.enc?t=${Date.now()}`;
             }
-            release = await res.json();
           }
 
-          const encAsset = release.assets?.find(a => a.name === 'firmware.enc');
-          if (!encAsset) {
-            statusEl.innerHTML = '<span style="color:var(--danger)">No encrypted binary (<code>firmware.enc</code>) found in latest release.</span>';
-            return;
-          }
-
-          cloudAssetUrl = encAsset.browser_download_url;
-          $('ota-release-tag').textContent = release.name || release.tag_name;
-          $('ota-release-date').textContent = new Date(release.published_at).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-          $('ota-release-size').textContent = (encAsset.size / (1024 * 1024)).toFixed(2) + ' MB';
+          $('ota-release-tag').textContent = release.tag || 'latest';
+          $('ota-release-date').textContent = new Date(release.date).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          $('ota-release-size').textContent = release.message ? (release.message.length > 28 ? release.message.slice(0, 28) + '…' : release.message) : 'Encrypted AES-256';
 
           const savedPwd = localStorage.getItem('ac_ota_pwd');
           if (savedPwd) $('ota-pwd').value = savedPwd;
