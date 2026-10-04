@@ -26,3 +26,6 @@ __pycache__/
 # OS generated files
 Thumbs.db
 .DS_Store
+
+# Temporary scratch directory
+scratch/
