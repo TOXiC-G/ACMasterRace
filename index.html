@@ -270,7 +270,7 @@ details[open] .chevron { transform: rotate(180deg); }
     <header class="header between">
       <div class="brand">
         <span>AC</span>
-        <span class="version-pill" title="Firmware Release v1.1">v1.1</span>
+        <span class="version-pill" title="Firmware Release v1.2">v1.2</span>
         <span id="mock-badge" class="mock-tag" hidden>MOCK</span>
       </div>
       <div class="header-right">
@@ -1032,6 +1032,10 @@ details[open] .chevron { transform: rotate(180deg); }
         renderDayButtons();
         openModal($('sched-sheet'));
       }
+      $('btn-add-sched').onclick = () => {
+        if (schedules.length >= 10) return showToast('Maximum 10 schedules allowed', 'error');
+        openSchedModal();
+      };
       function renderDayButtons() {
         document.querySelectorAll('#days-picker .day-btn').forEach((b) => {
         const d = Number(b.dataset.d);
